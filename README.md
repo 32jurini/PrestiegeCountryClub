@@ -1,30 +1,30 @@
-# PRESTIEGE COUNTRY CLUB — playable school build
+# PRESTIEGE COUNTRY CLUB — Deadline Update V3
 
-**Where Legends Tee Off.** An original browser-based 3D golf vertical slice made with Three.js. Upload all of these files and folders to the root of a public GitHub repository, then enable **Settings → Pages → Deploy from a branch → main / (root)**. The app requires internet access to load Three.js, Google Fonts, and optional licensed Rocketbox avatar models. Don't open `index.html` directly from Finder; use GitHub Pages or a local HTTP server.
+A complete replacement of the previous GitHub Pages project. Upload the **contents** of this folder to the repository root; do not upload the ZIP as a file and do not nest the project in an extra folder. The game depends on Three.js ES modules from a CDN, so an internet connection is required. Deploy under Settings → Pages → main → /(root).
 
-## Included
-- Home screen with bottom menu tabs
-- Three original settings: Royal Classic, Ocean's Edge, Summit Pines
-- Three playable holes per course, with tee shots, wind, ball flight, rebounds, putting, water penalties, bunkers, shots and per-round scorecards
-- Golfer identity settings and a tutorial screen explaining controls
-- Female and male Mixamo bot fallback models, plus uploaded golf animation files. The game **tries to load detailed Rocketbox avatars at runtime from the public Avatar Studio GitHub repository**. Those files are *not* stored in this ZIP. A failed network fetch falls back to X/Y Bot.
-- Golf Drive animation for driver; Golf Chip for iron/wedge; Golf Putt for putting; remaining uploaded animation assets for idle, walking, tee setup and reactions. The app checks skeleton track compatibility; unmatched animations are skipped, not guaranteed to work.
+## This build includes
+- An automatic first-time tutorial (start from **TEE OFF**), five coach lessons and optional replay from **ACADEMY**. Coach Timmy loads from the bundled `assets/characters/Timmy.fbx`; he attempts to play the uploaded golf, talking, pointing and greeting animations. If asset load fails, instructions remain usable.
+- New 3D blue projected shot-path and estimated landing target, club selection, left/right aiming and a hold-and-release swing meter.
+- Built-in WebAudio synthesized UI, swing, landing, cup and hazard audio. Click SOUND OFF to enable browser audio after user interaction. **This is sound effects, not background music, commentary or recorded speech.** Timmy's dialogue is shown as captions; there is no voice recording.
+- MyGolfer options for name, body frame, shirt color, pants color, hair color, eye color, and skin tone. A 3D model preview appears on the MyGolfer screen. Visible material changes work only where the loaded avatar has separately named meshes/materials. The included fallback Mixamo bots do not provide realistic editable hair, eyes or facial morph controls. **Not a full facial feature editor yet.**
+- Three original environments with three holes each, ball flight, wind, bounce, water, bunkers, scoring and round results.
+- Your uploaded swing (drive/chip/putt), movement, idle, tee, Timmy point/talk, wave, picking-up, thumbs-up and celebration FBX files. Animation loading uses bone-name matching, so some moves may fail on mismatched skeletons. Some animations are available as assets for follow-up sequences rather than fully linked to an in-game action.
+- Local browser settings and round records, **not** a cloud database or multiplayer.
 
 ## Controls
-- Hold Space to build swing power, release to strike.
-- Left/right arrows or A/D adjust the aim.
-- 1–4 select driver, iron, wedge, putter.
-- Drag on the course to slightly orbit the camera.
-- Ball must stop before the next stroke. After each hole, click **Next Hole**.
+- Left/right arrows or A/D: aim
+- Number keys 1–4: choose driver, iron, wedge, putter
+- Hold and release Space: swing power
+- Mouse drag: rotate camera a little
 
-## Important limitations
-This is **not** a commercial-grade PGA 2K simulator. Three-hole rounds per course, simplified flight/bounce/terrain physics, procedural trees, simplified club models, and no online multiplayer. Character customization currently saves player name, body choice, and clothing color preferences: individual outfit textures do **not** change on the loaded Rocketbox models. Tutorial loads the uploaded Timmy character alongside the golfer, but currently uses a lesson UI rather than a fully animated conversational coaching system. These limitations are intentional disclosures, not missing dependencies. We could not perform a real end-to-end browser rendering test in this environment; JavaScript syntax and asset inclusion were checked.
+## Known limitations and disclosures
+This is a playable school project build with simplified physics and vegetation. It does not yet reproduce the screenshot's AAA graphics, character facial detail, grass, crowd or animation quality. The blue path is a trajectory *estimate* rather than an exact physics predictor. Some Rocketbox avatar models are attempted via a public remote URL; the bundled local bots are used when unavailable. Animation synchronization to golf club and ball is not fully motion-captured or guaranteed. This build passed JavaScript syntax and archive integrity checks; **a live game test was not completed** because the local browser test was blocked by the browser environment.
 
-## Third-party assets / licensing
-- Three.js: MIT, https://threejs.org
-- Optional Rocketbox avatars: © Microsoft Corporation, Microsoft Rocketbox Avatar Library (MIT); loaded via `https://cdn.jsdelivr.net/gh/memoriesrohit/avatar-studio@main/models/*.glb` at runtime. Source: https://github.com/memoriesrohit/avatar-studio and https://github.com/microsoft/Microsoft-Rocketbox . Include upstream attribution and review its notices if distributing models.
-- The FBX assets provided in this archive are the user's own uploads and appear to come from Adobe Mixamo. Mixamo permits use in games but has restrictions on redistribution of raw character/animation files; **before publishing a public repository containing these FBX files, verify you are licensed to redistribute them**. For a public distribution, ideally bake animation into a distributable game asset in accordance with Adobe's applicable terms, rather than hosting standalone raw downloads. This is not legal advice.
-- The golf course geometry, game logic, and UI were authored for this school project.
+The project contains user-provided Mixamo FBX assets. Before deploying raw FBX files to a public GitHub Pages repository, check Adobe's distribution rules and the licenses of all models. Hosting model/animation raw files publicly may require a different licensing/deployment approach.
 
-## File list
-- `index.html`, `style.css`, `js/main.js`, `js/world.js`, `js/game.js`, `js/actors.js`, `assets/characters/`, `assets/animations/`.
+## Files
+- `index.html`, `style.css`
+- `js/main.js`, `js/game.js`, `js/world.js`, `js/actors.js`, `js/sound.js`
+- `assets/characters/` and `assets/animations/`
+
+No server/database is included. Data persistence is localStorage only.

@@ -1,0 +1,7 @@
+// Original synthesized sound effects; no audio files or music licenses required.
+export class SoundEngine {
+ constructor(){this.ctx=null;this.enabled=false;}
+ async toggle(){if(!this.ctx)this.ctx=new (window.AudioContext||window.webkitAudioContext)();await this.ctx.resume();this.enabled=!this.enabled;if(this.enabled)this.play('welcome');return this.enabled;}
+ tone(freq,duration=.16,type='sine',gain=.055,offset=0){if(!this.enabled||!this.ctx)return;const c=this.ctx,osc=c.createOscillator(),vol=c.createGain();osc.type=type;osc.frequency.setValueAtTime(freq,c.currentTime+offset);vol.gain.setValueAtTime(.0001,c.currentTime+offset);vol.gain.exponentialRampToValueAtTime(gain,c.currentTime+offset+.015);vol.gain.exponentialRampToValueAtTime(.0001,c.currentTime+offset+duration);osc.connect(vol).connect(c.destination);osc.start(c.currentTime+offset);osc.stop(c.currentTime+offset+duration+.03)}
+ play(event){if(!this.enabled)return;switch(event){case 'swing':this.tone(145,.24,'triangle',.08);this.tone(255,.12,'sine',.035,.08);break;case 'land':this.tone(110,.14,'sine',.05);break;case 'cup':for(let i=0;i<3;i++)this.tone([523,659,784][i],.22,'sine',.055,i*.11);break;case 'hazard':this.tone(180,.3,'sawtooth',.025);break;case 'welcome':this.tone(440,.13,'sine',.025);this.tone(554,.18,'sine',.025,.1);break;case 'menu':this.tone(400,.045,'sine',.012);break;}}
+}
