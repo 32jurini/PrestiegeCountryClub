@@ -1,0 +1,33 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Shot direction regression</title>
+<base href="../"><pre id="results">Loading golfer models and animation clips…</pre>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/","jszip":"https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm"}}</script>
+<script type="module">
+import * as T from 'three';
+import {Golfer} from './js/actors.js?v=shotline2';
+import {contactTime} from './js/shot-pose.js';
+const report=document.querySelector('#results'), rows=[];
+function check(ok,message){if(!ok)throw Error(message)}
+try {
+ for(const frame of ['male','female']){
+  const actor=new Golfer(new T.Scene());
+  await actor.load(frame);
+  await actor.loadAllAnimations(Object.keys(contactTime));
+  for(const degrees of [-26,0,32]){
+   const angle=T.MathUtils.degToRad(degrees),line=new T.Vector3(Math.sin(angle),0,-Math.cos(angle));
+   const ball=new T.Vector3(4,.6,-12);
+   for(const [name,time] of Object.entries(contactTime)){
+    actor.alignShot(name,ball,line,.5);
+    actor.shot(name);
+    const tip=name==='tee'?[...actor.basePose.keys()].find(b=>b.name.endsWith('RightHandIndex3')):actor.clubHead;
+    function sample(dt){actor.update(dt);return tip.getWorldPosition(new T.Vector3())}
+    const before=sample(time-1/60),impact=sample(1/60),after=sample(1/60);
+    check(impact.distanceTo(ball)<(name==='tee'?.10:.035),frame+' '+name+' misses ball');
+    const travel=name==='tee'?impact.clone().sub(actor.root.position):after.sub(before);
+    check(travel.setY(0).normalize().dot(line)>.97,frame+' '+name+' faces away from aim');
+    rows.push(frame+' '+degrees+'° '+name+' PASS');
+   }
+  }
+ }
+ report.textContent=rows.join('\n')+'\n24/24 passed';
+}catch(e){report.textContent=rows.join('\n')+'\nFAILED: '+e.message;throw e}
+</script></html>
