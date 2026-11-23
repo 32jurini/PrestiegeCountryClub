@@ -1,30 +1,44 @@
-# PRESTIEGE COUNTRY CLUB — Deadline Update V3
+# Prestiege Country Club — V4 School Presentation Build
 
-A complete replacement of the previous GitHub Pages project. Upload the **contents** of this folder to the repository root; do not upload the ZIP as a file and do not nest the project in an extra folder. The game depends on Three.js ES modules from a CDN, so an internet connection is required. Deploy under Settings → Pages → main → /(root).
+A 3D golf-school project built with Three.js, HTML, CSS and JavaScript. This is a work-in-progress simulator, not PGA TOUR 2K.
 
-## This build includes
-- An automatic first-time tutorial (start from **TEE OFF**), five coach lessons and optional replay from **ACADEMY**. Coach Timmy loads from the bundled `assets/characters/Timmy.fbx`; he attempts to play the uploaded golf, talking, pointing and greeting animations. If asset load fails, instructions remain usable.
-- New 3D blue projected shot-path and estimated landing target, club selection, left/right aiming and a hold-and-release swing meter.
-- Built-in WebAudio synthesized UI, swing, landing, cup and hazard audio. Click SOUND OFF to enable browser audio after user interaction. **This is sound effects, not background music, commentary or recorded speech.** Timmy's dialogue is shown as captions; there is no voice recording.
-- MyGolfer options for name, body frame, shirt color, pants color, hair color, eye color, and skin tone. A 3D model preview appears on the MyGolfer screen. Visible material changes work only where the loaded avatar has separately named meshes/materials. The included fallback Mixamo bots do not provide realistic editable hair, eyes or facial morph controls. **Not a full facial feature editor yet.**
-- Three original environments with three holes each, ball flight, wind, bounce, water, bunkers, scoring and round results.
-- Your uploaded swing (drive/chip/putt), movement, idle, tee, Timmy point/talk, wave, picking-up, thumbs-up and celebration FBX files. Animation loading uses bone-name matching, so some moves may fail on mismatched skeletons. Some animations are available as assets for follow-up sequences rather than fully linked to an in-game action.
-- Local browser settings and round records, **not** a cloud database or multiplayer.
+## Features
+
+- First-time account creation and sign-in **for this browser only** (local demo; no real cloud authentication or password recovery)
+- Male/female MyGolfer choice, colors and a saved browser profile
+- Coach Timmy's seven-step on-screen tutorial, automatically offered on the first tee
+- 19 supplied FBX animations packed into `assets/animations.zip`
+- Split Timmy model in `assets/characters/Timmy.part1` and `.part2`; the browser reassembles it for animation
+- Third-person swing camera that shows the backswing before the shot flight, an aiming tracer, club selection, powered shot timing, simulated hazards and scorecards
+- Three stylized course environments with Three.js terrain, trees and course textures
+- Generated Web Audio sound effects
+
+## GitHub Pages
+
+Upload all the **contents** of this folder into the root of the public `PrestiegeCountryClub` repository. `index.html` must be visible in the repository root. Keep the `js`, `assets` folders and `style.css`, `style-v4.css` in their relative paths. On GitHub, go to **Settings > Pages > Deploy from a branch > main > /(root)**. Once deployment finishes, visit `https://32jurini.github.io/PrestiegeCountryClub/`.
+
+**If the source code was already published automatically:** you only need to upload the three asset files contained in the separate `Prestiege-V4-GitHub-Asset-Upload.zip` file, preserving their `assets/` paths:
+
+- `assets/animations.zip` (15.3 MB)
+- `assets/characters/Timmy.part1` (17.2 MB)
+- `assets/characters/Timmy.part2` (17.2 MB)
+
+These are individually below GitHub's 25 MB browser-upload limit. Do not upload the ZIP *as one file* into GitHub: unzip it first, then drag in the `assets` directory and commit.
+
+**Important:** The repository currently contains `assets/characters/X Bot.fbx` and `Y Bot.fbx` as fallback golfers. Coach Timmy uses the two split files. The game can load character animation files from the compressed animation pack.
 
 ## Controls
-- Left/right arrows or A/D: aim
-- Number keys 1–4: choose driver, iron, wedge, putter
-- Hold and release Space: swing power
-- Mouse drag: rotate camera a little
 
-## Known limitations and disclosures
-This is a playable school project build with simplified physics and vegetation. It does not yet reproduce the screenshot's AAA graphics, character facial detail, grass, crowd or animation quality. The blue path is a trajectory *estimate* rather than an exact physics predictor. Some Rocketbox avatar models are attempted via a public remote URL; the bundled local bots are used when unavailable. Animation synchronization to golf club and ball is not fully motion-captured or guaranteed. This build passed JavaScript syntax and archive integrity checks; **a live game test was not completed** because the local browser test was blocked by the browser environment.
+- `A/D`, left/right arrows: aim
+- `1` driver; `2` 7 iron; `3` wedge; `4` putter
+- Hold Space to power a shot and release to swing
+- Drag mouse during gameplay to adjust camera orbit
+- See the Clubhouse and Academy tabs for the tutorial
 
-The project contains user-provided Mixamo FBX assets. Before deploying raw FBX files to a public GitHub Pages repository, check Adobe's distribution rules and the licenses of all models. Hosting model/animation raw files publicly may require a different licensing/deployment approach.
+## School-project limitations
 
-## Files
-- `index.html`, `style.css`
-- `js/main.js`, `js/game.js`, `js/world.js`, `js/actors.js`, `js/sound.js`
-- `assets/characters/` and `assets/animations/`
-
-No server/database is included. Data persistence is localStorage only.
+- Accounts and scores are only saved in localStorage on that computer, not online. It is not a secure online account database; add a hosted backend (for example Supabase Auth) before accepting real personal credentials.
+- 3D golfer model quality and material customization are limited by the source assets. Hair/eye tint changes only work on identifiable model materials.
+- Timmy has on-screen tutorial dialogue and animation gestures, but no spoken voice narration.
+- A browser gameplay pass on GitHub Pages and final animation rig testing are still required before a public presentation.
+- Third-party Mixamo assets and external model resources require a license and redistribution review before any public release. This version is for school-project testing.
