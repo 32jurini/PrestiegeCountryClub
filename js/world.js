@@ -5,9 +5,9 @@ export const COURSES={royal:{name:'THE ROYAL CLASSIC',type:'parkland',sky:0x93be
  {"name":"Captain’s Corner","par":5,"hint":"Lay up before the cross bunkers or take on the corner.","route":[[0,0,10,0],[65,22,17,0],[145,54,22,0],[207,18,13,0],[265,-4,10,0]],"green":[10,13],"sand":[[35,136,9,7],[49,139,5,6],[11,253,6,9]],"water":[]}
 ]},
 ocean:{name:"OCEAN'S EDGE",type:'coastal',sky:0x8abdd4,fog:0xa5c3bf,grass:0x4e826b,rough:0x467769,fairway:0x86a881,trees:0x385d4c,wind:12,holes:[
- {"name":"Shoreline Run","par":4,"hint":"Play left of the inlet on the way to the shoreline green.","route":[[0,0,11,0],[70,-16,14,0],[130,-18,12,0],[192,15,9,0]],"green":[9,13],"sand":[[-29,120,5,12]],"water":[[16,119,17,33]]},
- {"name":"Tidepool Carry","par":3,"hint":"Carry the tidal pool to the green beyond its far bank.","route":[[0,0,9,0],[28,-5,10,0],[54,-14,9,0],[81,-21,8,0]],"green":[10,9],"sand":[[-33,77,4,8]],"water":[[-13,48,31,19]]},
- {"name":"The Peninsula","par":5,"hint":"Use the wide left shelf before attacking the narrow point.","route":[[0,0,10,0],[80,-31,21,0],[152,-42,18,0],[212,-17,13,0],[259,21,7,0]],"green":[8,11],"sand":[[-52,149,6,13]],"water":[[7,189,28,42],[1,260,11,20]]}
+ {"name":"Shoreline Run","par":4,"hint":"Carry the tidal cut. The left fairway stays dry past the inlet.","route":[[0,0,11,0],[70,-16,14,0],[130,-18,12,0],[192,15,9,0]],"green":[9,13],"sand":[[-29,120,5,12]],"water":[[16,119,17,33],[-2,66,16,8],[24,175,13,15]]},
+ {"name":"Tidepool Carry","par":3,"hint":"Carry the front pool. Water guards the right side and the back of the green.","route":[[0,0,9,0],[28,-5,10,0],[54,-14,9,0],[81,-21,8,0]],"green":[10,9],"sand":[[-33,77,4,8]],"water":[[-13,48,31,19],[1,75,12,11],[-22,98,18,8]]},
+ {"name":"The Peninsula","par":5,"hint":"Drive toward the left shelf. Split the two coves on the approach.","route":[[0,0,10,0],[80,-31,21,0],[152,-42,18,0],[212,-17,13,0],[259,21,7,0]],"green":[8,11],"sand":[[-52,149,6,13]],"water":[[7,189,28,42],[1,260,11,20],[-6,125,22,19],[-30,207,12,12]]}
 ]},
 summit:{name:'SUMMIT PINES',type:'mountain',sky:0x9dc2d4,fog:0xa4b8af,grass:0x3f6547,rough:0x355940,fairway:0x72966a,trees:0x1e4133,wind:6,holes:[
  {"name":"Ridge Walk","par":4,"hint":"Find the broad saddle before the uphill approach.","route":[[0,0,10,0],[64,12,15,1],[128,29,18,1],[187,38,9,7]],"green":[10,9],"sand":[[15,129,6,11],[24,184,5,6]],"water":[]},
