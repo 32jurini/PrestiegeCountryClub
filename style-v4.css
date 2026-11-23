@@ -2,3 +2,7 @@
 /* The club opens immediately. Account sign-in is optional and never blocks game startup. */
 .account-gate.hidden{display:none!important}
 body:not(.gated) #topbar,body:not(.gated) #bottomNav{pointer-events:auto}
+
+/* Startup splash must not trap players after a failed module import. */
+#loader.hidden{display:none!important}
+#error.hidden{display:none!important}
