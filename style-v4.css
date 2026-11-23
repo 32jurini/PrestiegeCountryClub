@@ -6,3 +6,7 @@ body:not(.gated) #topbar,body:not(.gated) #bottomNav{pointer-events:auto}
 /* Startup splash must not trap players after a failed module import. */
 #loader.hidden{display:none!important}
 #error.hidden{display:none!important}
+
+#golfer .preview { overflow:hidden; }
+#golfer .preview canvas { position:absolute; inset:0; }
+#golfer .preview-title, #golfer .preview-text { position:absolute; z-index:1; }

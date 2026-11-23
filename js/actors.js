@@ -4,22 +4,92 @@ import JSZip from 'jszip';
 const fbx=new FBXLoader();
 const animationFiles={idle:'Breathing Idle.fbx',drive:'Golf Drive.fbx',chip:'Golf Chip.fbx',putt:'Golf Putt.fbx',walk:'Walking.fbx',run:'Running (1).fbx',tee:'Golf Tee Up.fbx',pick:'Picking Up.fbx',talk:'Talking.fbx',point:'Pointing Forward.fbx',pointGesture:'Pointing Gesture.fbx',cheer:'Cheering.fbx',clap:'Clapping.fbx',angry:'Angry.fbx',wave:'Waving.fbx',thumb:'Sitting Thumbs Up.fbx',dance:'Breakdance Uprock.fbx',footwork:'Breakdance Footwork To Idle.fbx',freeze:'Breakdance Freeze Var 3.fbx'};
 const promiseLoad=(url,loader)=>new Promise((resolve,reject)=>loader.load(url,resolve,undefined,reject));
+async function readPack(name, count) {
+ const parts = await Promise.all(Array.from({length: count}, async (_, index) => {
+  const url = new URL('../assets/pack/' + name + '.' + index, import.meta.url);
+  const response = await fetch(url);
+  if (!response.ok) throw Error('Could not load ' + name + ' part ' + (index + 1));
+  return response.arrayBuffer();
+ }));
+ return new Blob(parts).arrayBuffer();
+}
 let archivePromise;
-async function getAnimationArchive(){if(!archivePromise)archivePromise=(async()=>{const res=await fetch('./assets/animations.zip');if(!res.ok)throw new Error('Animation pack not uploaded');return JSZip.loadAsync(await res.arrayBuffer())})();return archivePromise;}
+function getAnimationArchive() {
+ return archivePromise ??= readPack('golf', 2).then(bytes => JSZip.loadAsync(bytes)).catch(error => {
+  archivePromise = undefined;
+  throw error;
+ });
+}
+const clipCache = new Map();
+function sourceClip(name) {
+ if (!clipCache.has(name)) clipCache.set(name, (async () => {
+  const entry = (await getAnimationArchive()).file(animationFiles[name]);
+  return fbx.parse(await entry.async('arraybuffer'), './assets/animations/').animations.find(clip => clip.tracks.length);
+ })().catch(error => { clipCache.delete(name); throw error; }));
+ return clipCache.get(name);
+}
 export class Golfer{
  constructor(scene){this.root=new THREE.Group();scene.add(this.root);this.model=null;this.mixer=null;this.actions=new Map();this.mode='idle';this.club=null;this.humanSource='';this.nativeClips=[];this.appearance={};this.proceduralTime=0;this.proceduralName='idle';this.basePose=new Map();this.loadVersion=0;this.updateHandClub()}
  updateHandClub(){const group=new THREE.Group();const shaft=new THREE.Mesh(new THREE.CylinderGeometry(.018,.026,1.05,10),new THREE.MeshStandardMaterial({color:0xbcc8c5,metalness:.72,roughness:.25}));shaft.rotation.z=.30;group.add(shaft);const head=new THREE.Mesh(new THREE.BoxGeometry(.23,.075,.13),new THREE.MeshStandardMaterial({color:0x263b39,metalness:.65,roughness:.25}));head.position.set(-.16,-.51,0);group.add(head);group.position.set(-.38,1.02,.22);group.rotation.x=-.08;this.root.add(group);this.club=group;this.club.visible=true;this.clubHead=head}
- setClub(type){if(!this.club)return;const colors={driver:0x1d2528,iron:0x9ca7a5,wedge:0x9eaaa9,putter:0x202b2b};this.clubHead.material.color.setHex(colors[type]||colors.iron);this.club.scale.set(type==='driver'?1.12:1,type==='putter'?.9:1,1)}
- async loadLocal(url){let model;try{model=await promiseLoad(url,fbx)}catch(err){if(!url.endsWith('/Timmy.fbx'))throw err;const parts=await Promise.all(['Timmy.part1','Timmy.part2'].map(async filename=>{const response=await fetch('./assets/characters/'+filename);if(!response.ok)throw new Error('Missing '+filename);return new Uint8Array(await response.arrayBuffer())}));const merged=new Uint8Array(parts.reduce((sum,part)=>sum+part.length,0));let offset=0;for(const part of parts){merged.set(part,offset);offset+=part.length}model=fbx.parse(merged.buffer,'./assets/characters/')}this.nativeClips=model.animations||[];return this.installModel(model,'Coach Timmy / local FBX')}
- installModel(model,source){if(this.model){this.root.remove(this.model);this.mixer?.stopAllAction()}this.model=model;this.model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material){const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>{m.roughness=Math.max(.42,m.roughness??.7);if(m.transparent)m.depthWrite=true})}}});const box=new THREE.Box3().setFromObject(model),size=box.getSize(new THREE.Vector3());model.scale.multiplyScalar(1.82/(size.y||1));const scaled=new THREE.Box3().setFromObject(model);model.position.y-=scaled.min.y;this.root.add(model);this.mixer=new THREE.AnimationMixer(model);this.actions.clear();this.basePose.clear();model.traverse(o=>{if(o.isBone)this.basePose.set(o,o.quaternion.clone())});this.installFaceDetails();this.humanSource=source;this.animate('idle',true);this.applyAppearance(this.appearance);return source}
+ setClub(type){if(!this.club)return;const colors={driver:0x1d2528,iron:0x9ca7a5,wedge:0x9eaaa9,putter:0x202b2b};this.clubHead.material.color.setHex(colors[type]||colors.iron);this.club.scale.set(type==='driver'?1.12:1,type==='putter'?.9:1,1).multiplyScalar(this.clubBaseScale||1)}
+ async loadLocal(url) {
+  const coach = url.endsWith('/Timmy.fbx');
+  const model = coach ? fbx.parse(await readPack('coach', 4), './assets/characters/') : await promiseLoad(url, fbx);
+  this.nativeClips = model.animations || [];
+  return this.installModel(model, coach ? 'Coach Timmy' : 'Local golfer');
+ }
+ installModel(model,source){if(this.model){this.club.removeFromParent();this.root.add(this.club);this.root.remove(this.model);this.mixer?.stopAllAction()}this.model=model;this.model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material){const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>{m.roughness=Math.max(.42,m.roughness??.7);if(m.transparent)m.depthWrite=true})}}});const box=new THREE.Box3().setFromObject(model),size=box.getSize(new THREE.Vector3());model.scale.multiplyScalar(1.82/(size.y||1));const scaled=new THREE.Box3().setFromObject(model);model.position.y-=scaled.min.y;this.root.add(model);this.mixer=new THREE.AnimationMixer(model);this.actions.clear();this.basePose.clear();model.traverse(o=>{if(o.isBone)this.basePose.set(o,o.quaternion.clone())});if(source!=='Coach Timmy')this.installFaceDetails();const hand=model.getObjectByProperty('isBone',true) && [...this.basePose.keys()].find(b=>/RightHand$/.test(b.name));
+ if(hand){
+  hand.add(this.club);
+  this.club.position.set(0,0,0);
+  const unit=hand.getWorldScale(new THREE.Vector3()).x||1;
+  this.clubBaseScale=1/unit;
+  this.club.scale.setScalar(this.clubBaseScale);
+  this.club.children[0].position.y=-.48;
+  this.clubHead.position.y=-.99;
+ }
+ this.humanSource=source;this.animate('idle',true);this.applyAppearance(this.appearance);return source}
  async load(frame='male'){const version=++this.loadVersion,file=frame==='female'?'X Bot.fbx':'Y Bot.fbx';const model=await promiseLoad(`./assets/characters/${encodeURIComponent(file)}`,fbx);if(version!==this.loadVersion)return this.humanSource;this.nativeClips=model.animations||[];return this.installModel(model,frame==='female'?'Local female golfer model':'Local male golfer model')}
- installFaceDetails(){if(this.faceDetails){this.root.remove(this.faceDetails)}const g=new THREE.Group();g.name='PCC custom appearance';const hair=new THREE.Mesh(new THREE.SphereGeometry(.125,12,8),new THREE.MeshStandardMaterial({color:0x36261f}));hair.scale.set(1,.35,.86);hair.position.set(0,1.78,0);g.add(hair);this.hairDetail=hair;const eyes=[];for(const x of [-.045,.045]){const e=new THREE.Mesh(new THREE.SphereGeometry(.012,8,6),new THREE.MeshStandardMaterial({color:0x4c8069}));e.position.set(x,1.695,.095);g.add(e);eyes.push(e)}this.eyeDetails=eyes;this.faceDetails=g;this.root.add(g)}
+ installFaceDetails(){if(this.faceDetails){this.root.remove(this.faceDetails)}const g=new THREE.Group();g.name='PCC custom appearance';const hair=new THREE.Mesh(new THREE.SphereGeometry(.125,12,8),new THREE.MeshStandardMaterial({color:0x36261f}));hair.scale.set(1,.35,.86);hair.position.set(0,1.78,0);g.add(hair);this.hairDetail=hair;const eyes=[];for(const x of [-.045,.045]){const e=new THREE.Mesh(new THREE.SphereGeometry(.012,8,6),new THREE.MeshStandardMaterial({color:0x4c8069}));e.position.set(x,1.695,.095);g.add(e);eyes.push(e)}this.eyeDetails=eyes;this.faceDetails=g;this.root.add(g);const head=[...this.basePose.keys()].find(b=>/Head$/.test(b.name));if(head)head.attach(g)}
  proceduralPose(dt){if(!this.model)return;this.proceduralTime+=dt;const t=this.proceduralTime,n=this.proceduralName;const swing=n==='drive'||n==='chip'||n==='putt';const period=n==='drive'?1.35:n==='chip'?1.15:1.05;const u=Math.min(1,t/period);const windup=u<.43?Math.sin(u/.43*Math.PI/2):Math.cos((u-.43)/.57*Math.PI/2);const follow=u<.43?0:Math.sin((u-.43)/.57*Math.PI/2);const moving=n==='walk'||n==='run';const phase=t*(n==='run'?10:6);this.model.traverse(o=>{if(!o.isBone)return;const q=this.basePose.get(o);if(!q)return;o.quaternion.copy(q);const name=o.name.toLowerCase().replace(/mixamorig[:_]?/g,'');const left=/left|_l\b/.test(name),right=/right|_r\b/.test(name);if(swing){if(/spine|chest/.test(name))o.rotateY((windup*.34-follow*.55)*(n==='putt'?.3:1));if(/upperarm|arm/.test(name)&&!/forearm/.test(name))o.rotateX((left?-1:1)*(windup*.55-follow*.75));if(/forearm/.test(name))o.rotateZ((left?1:-1)*(windup*.32-follow*.4));}else if(moving){if(/upleg|thigh/.test(name))o.rotateX(Math.sin(phase+(left?0:Math.PI))*.35);if(/upperarm|arm/.test(name)&&!/forearm/.test(name))o.rotateX(Math.sin(phase+(left?Math.PI:0))*.22)}else if(n==='wave'||n==='point'||n==='talk'||n==='cheer'||n==='clap'){if(/upperarm|arm/.test(name)&&!/forearm/.test(name))o.rotateZ((left?1:-1)*(n==='cheer'?1.1:n==='wave'?.8:.35));if(/forearm/.test(name))o.rotateX(Math.sin(t*5)*.18)}else if(/spine|chest/.test(name))o.rotateX(Math.sin(t*2)*.012)});if(swing&&u>=1){this.proceduralName='idle';this.proceduralTime=0}}
- async loadAnimation(name){if(!this.mixer||!animationFiles[name])return false;try{let data;try{const zip=await getAnimationArchive();const entry=zip.file(animationFiles[name]);if(!entry)throw new Error('Animation not found in ZIP: '+animationFiles[name]);data=await entry.async('arraybuffer')}catch(e){const response=await fetch('./assets/animations/'+encodeURIComponent(animationFiles[name]));if(!response.ok)return false;data=await response.arrayBuffer()}const imported=fbx.parse(data,'./assets/animations/');if(!imported.animations?.length)return false;let clip=imported.animations[0];const bones=new Set();this.model.traverse(o=>{if(o.isBone)bones.add(o.name)});const norm=n=>n.toLowerCase().replace(/mixamorig/g,'').replace(/[^a-z0-9]/g,'');const names=[...bones];const tracks=clip.tracks.map(t=>{const dot=t.name.indexOf('.');if(dot<0)return null;const src=t.name.slice(0,dot),prop=t.name.slice(dot),dest=names.find(n=>norm(n)===norm(src));if(!dest)return null;const copy=t.clone();copy.name=dest+prop;return copy}).filter(Boolean);if(!tracks.length)return false;clip=new THREE.AnimationClip(name,clip.duration,tracks);const action=this.mixer.clipAction(clip);this.actions.set(name,action);return true}catch(e){console.warn('Animation failed:',name,e);return false}}
+ async loadAnimation(name){if(!this.mixer||!animationFiles[name])return false;try{const mixer=this.mixer;let clip=await sourceClip(name);if(!clip||mixer!==this.mixer)return false;const bones=new Set();this.model.traverse(o=>{if(o.isBone)bones.add(o.name)});const norm=n=>n.toLowerCase().replace(/mixamorig[0-9]*/g,'').replace(/[^a-z0-9]/g,'');const names=[...bones];const tracks=clip.tracks.map(t=>{const dot=t.name.indexOf('.');if(dot<0)return null;const src=t.name.slice(0,dot),prop=t.name.slice(dot),dest=names.find(n=>norm(n)===norm(src));if(!dest)return null;if(prop!=='.quaternion')return null;const copy=t.clone();copy.name=dest+prop;return copy}).filter(Boolean);if(!tracks.some(track=>track.name.endsWith('.quaternion')))return false;clip=new THREE.AnimationClip(name,clip.duration,tracks);const action=this.mixer.clipAction(clip);this.actions.set(name,action);return true}catch(e){console.warn('Animation failed:',name,e);return false}}
  async loadAllAnimations(names=Object.keys(animationFiles)){const results={};for(const name of names){results[name]=await this.loadAnimation(name);this.onAnimationProgress?.({name,loaded:Object.keys(results).length,total:names.length,ok:results[name]})}if(this.actions.has('idle'))this.animate('idle',true);return results}
- applyAppearance(palette={}){this.appearance={...this.appearance,...palette};if(this.hairDetail&&palette.hair)this.hairDetail.material.color.set(palette.hair);if(this.eyeDetails&&palette.eyes)this.eyeDetails.forEach(e=>e.material.color.set(palette.eyes));if(!this.model)return;const colors={hair:palette.hair,eyes:palette.eyes,skin:palette.skin,shirt:palette.shirt,pants:palette.pants};this.model.traverse(o=>{if(!o.isMesh||!o.material)return;const name=(o.name+' '+(o.material.name||'')).toLowerCase();let key=null;if(/hair|eyebrow|brow/.test(name))key='hair';else if(/iris|eye/.test(name))key='eyes';else if(/skin|face|head|arm|hand|neck/.test(name))key='skin';else if(/shirt|polo|top|jersey|sweater|jacket/.test(name))key='shirt';else if(/pant|trouser|short|skirt/.test(name))key='pants';if(!key){const y=o.getWorldPosition(new THREE.Vector3()).y;if(/bot|body|mesh|geometry/i.test(name))key=y>1.25?'shirt':y>.55?'pants':'skin'}if(!key||!colors[key])return;if(!o.userData.pccBaseMaterial)o.userData.pccBaseMaterial=Array.isArray(o.material)?o.material.map(m=>m.clone()):o.material.clone();const base=o.userData.pccBaseMaterial;const apply=m=>{const clone=m.clone();if(clone.color)clone.color.set(colors[key]);return clone};o.material=Array.isArray(base)?base.map(apply):apply(base)})}
+ applyAppearance(palette={}) {
+  Object.assign(this.appearance, palette);
+  const colors=this.appearance;
+  if(colors.hair) this.hairDetail?.material.color.set(colors.hair);
+  if(colors.eyes) this.eyeDetails?.forEach(eye=>eye.material.color.set(colors.eyes));
+  if(!this.model || !colors.skin) return;
+  const shades = Object.fromEntries(['skin','shirt','pants'].map(key=>[key,new THREE.Color(colors[key])]));
+  this.model.traverse(mesh=>{
+   if(!mesh.isSkinnedMesh) return;
+   const geometry=mesh.geometry;
+   const indices=geometry.getAttribute('skinIndex');
+   if(!indices) return;
+   let tint=geometry.getAttribute('color');
+   if(!mesh.userData.paletteRegions) {
+    const weights=geometry.getAttribute('skinWeight');
+    mesh.userData.paletteRegions=Array.from({length:indices.count},(_,i)=>{
+     let slot=0;
+     for(let j=1;j<4;j++) if(weights.getComponent(i,j)>weights.getComponent(i,slot)) slot=j;
+     const bone=mesh.skeleton.bones[indices.getComponent(i,slot)]?.name || '';
+     if(/leg|foot|toe|hips/i.test(bone)) return 'pants';
+     return /head|neck|forearm|hand/i.test(bone)?'skin':'shirt';
+    });
+    tint=new THREE.Float32BufferAttribute(new Float32Array(indices.count*3),3);
+    geometry.setAttribute('color',tint);
+    for(const mat of [].concat(mesh.material)){
+     mat.vertexColors=true;mat.color.set(0xffffff);mat.needsUpdate=true;
+    }
+   }
+   mesh.userData.paletteRegions.forEach((region,i)=>{
+    const c=shades[region];tint.setXYZ(i,c.r,c.g,c.b);
+   });
+   tint.needsUpdate=true;
+  });
+ }
  animate(name,force=false){if(!this.mixer)return;if(name===this.mode&&!force)return;let action=this.actions.get(name);if(!action)action=this.actions.get('idle');if(!action){this.proceduralName=name;this.proceduralTime=0;this.mode=name;return}this.proceduralName='none';const old=this.actions.get(this.mode);if(old&&old!==action)old.fadeOut(.18);action.reset().fadeIn(.18).play();action.setLoop(THREE.LoopRepeat,Infinity);action.clampWhenFinished=false;this.mode=this.actions.has(name)?name:'idle'}
- shot(name){if(!this.actions.has(name)){this.proceduralName=name;this.proceduralTime=0;this.mode=name;return}const action=this.actions.get(name),old=this.actions.get(this.mode);if(old&&old!==action)old.fadeOut(.12);action.reset().fadeIn(.12).setLoop(THREE.LoopOnce,1);action.clampWhenFinished=true;action.play();this.mode=name;const duration=Math.min((action.getClip().duration||2)*950,4200);clearTimeout(this.returnTimer);this.returnTimer=setTimeout(()=>this.animate('idle',true),duration)}
+ shot(name){clearTimeout(this.returnTimer);if(!this.actions.has(name)){this.proceduralName=name;this.proceduralTime=0;this.mode=name;return}this.proceduralName='none';const action=this.actions.get(name),old=this.actions.get(this.mode);if(old&&old!==action)old.fadeOut(.12);action.reset().fadeIn(.12).setLoop(THREE.LoopOnce,1);action.clampWhenFinished=true;action.play();this.mode=name;const duration=Math.min((action.getClip().duration||2)*950,4200);clearTimeout(this.returnTimer);this.returnTimer=setTimeout(()=>this.animate('idle',true),duration)}
  update(dt){this.mixer?.update(dt);if(this.proceduralName!=='none')this.proceduralPose(dt)}setVisible(v){this.root.visible=v}
 }
 export {animationFiles};
