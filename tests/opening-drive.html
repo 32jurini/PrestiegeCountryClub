@@ -4,8 +4,8 @@
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/","jszip":"https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm"}}</script>
 <script type="module">
 import * as T from 'three';
-import {GolfGame} from './js/game.js?v=teecontact1';
-import {World} from './js/world.js?v=drive3';
+import {GolfGame} from './js/game.js?v=layouts1';
+import {World} from './js/world.js?v=layouts1';
 const noop = () => {};
 const game = Object.assign(Object.create(GolfGame.prototype), {
   world: new World(new T.Scene()), position: new T.Vector3(), vel: new T.Vector3(),
@@ -17,6 +17,7 @@ for (const course of ['royal','summit','ocean']) {
   for (const firstStep of [.0001,.0008,1/120]) {
     await game.begin(course);
     game.wind=0;
+    if(course==='ocean')game.aimDelta(-10); // Aim onto the fairway left of the inlet.
     game.startCharge();
     for (let i=0;i<47;i++) game.update(.025);
     game.releaseShot();
