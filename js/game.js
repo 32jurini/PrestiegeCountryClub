@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {World,COURSES} from './world.js';
-import {Golfer} from './actors.js';
+import {Golfer} from './actors.js?v=clubs19';
 const clamp=THREE.MathUtils.clamp,$=id=>document.getElementById(id);
 const CLUBS={driver:{name:'DRIVER',speed:35,loft:.29,range:250},iron:{name:'7 IRON',speed:28,loft:.49,range:160},wedge:{name:'WEDGE',speed:21,loft:.78,range:75},putter:{name:'PUTTER',speed:11,loft:.015,range:35}};
 export class GolfGame{
