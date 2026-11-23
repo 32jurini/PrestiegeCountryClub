@@ -1,0 +1,35 @@
+<!doctype html><meta charset="utf-8"><title>Opening drive regression</title>
+<base href="../"><pre id="result">Testing opening drives…</pre>
+<div hidden id="roundModal"></div><div hidden id="courseLabel"></div><div hidden id="holeLabel"></div><div hidden id="parLabel"></div>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/","jszip":"https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm"}}</script>
+<script type="module">
+import * as T from 'three';
+import {GolfGame} from './js/game.js?v=teecontact1';
+import {World} from './js/world.js?v=drive3';
+const noop = () => {};
+const game = Object.assign(Object.create(GolfGame.prototype), {
+  world: new World(new T.Scene()), position: new T.Vector3(), vel: new T.Vector3(),
+  ball: new T.Object3D(), shotPreview: {group:{}}, golfer: {setVisible:noop, setClub:noop, shot:noop, update:noop},
+  refresh:noop, notify:noop, placeGolfer:noop, moveCamera:noop, onSfx:noop
+});
+const results=[];
+for (const course of ['royal','summit','ocean']) {
+  for (const firstStep of [.0001,.0008,1/120]) {
+    await game.begin(course);
+    game.wind=0;
+    game.startCharge();
+    for (let i=0;i<47;i++) game.update(.025);
+    game.releaseShot();
+    // Land the impact frame a fraction of a millisecond before its end.
+    while (game.swingTimer+.025 < game.ballLaunchDelay) game.update(.025);
+    game.update(game.ballLaunchDelay-game.swingTimer+firstStep);
+    for (let i=0;i<2400 && game.swinging;i++) game.update(1/120);
+    results.push(course+' '+firstStep.toFixed(4)+' s: '+game.carryYards+' yd carry, '+game.travelYards()+' yd total');
+    if (game.swinging || game.shots!==1 || game.carryYards<225 || game.carryYards>245) {
+      document.getElementById('result').textContent='FAILED '+results.at(-1);
+      throw Error(results.at(-1));
+    }
+  }
+}
+document.getElementById('result').textContent=results.join('\n');
+</script>
