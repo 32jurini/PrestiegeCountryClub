@@ -1,7 +1,7 @@
 import {contactTime} from './shot-pose.js?v=approach2';
 import * as THREE from 'three';
 import {World,COURSES} from './world.js?v=approach2';
-import {Golfer} from './actors.js?v=fittedcap';
+import {Golfer} from './actors.js?v=humanportrait';
 const clamp=THREE.MathUtils.clamp,$=id=>document.getElementById(id);
 const BALL_RADIUS = .029;
 const CLUBS={driver:{name:'DRIVER',speed:43,loft:.395,range:255},iron:{name:'7 IRON',speed:28,loft:.49,range:160},wedge:{name:'WEDGE',speed:21,loft:.78,range:75},putter:{name:'PUTTER',speed:11,loft:.015,range:35}};

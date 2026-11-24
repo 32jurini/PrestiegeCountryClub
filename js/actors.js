@@ -1,5 +1,4 @@
-import {dressGolfer} from './outfit.js?v=approach2';
-import {loadFittedModel,fitToRig} from './tour-golfer.js?v=fittedcap';
+import {loadFittedModel,fitToRig,tintGolfer} from './tour-golfer.js?v=humanportrait';
 import {measureShot} from './shot-pose.js?v=approach2';
 import * as THREE from 'three';
 import {FBXLoader} from 'three/addons/loaders/FBXLoader.js';
@@ -80,7 +79,7 @@ export class Golfer{
   this.nativeClips = model.animations || [];
   return this.installModel(model, coach ? 'Coach Timmy' : 'Local golfer');
  }
- installModel(model,source,fitted=null){if(this.model){this.club.removeFromParent();this.root.add(this.club);this.root.remove(this.model);this.mixer?.stopAllAction()}this.poses=new Map();this.model=model;this.model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material){const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>{m.roughness=Math.max(.42,m.roughness??.7);if(m.transparent)m.depthWrite=true})}}});const box=new THREE.Box3().setFromObject(model),size=box.getSize(new THREE.Vector3());model.scale.multiplyScalar(1.82/(size.y||1));const scaled=new THREE.Box3().setFromObject(model);model.position.y-=scaled.min.y;this.root.add(model);this.mixer=new THREE.AnimationMixer(model);this.actions.clear();this.basePose.clear();model.traverse(o=>{if(o.isBone)this.basePose.set(o,o.quaternion.clone())});this.outfit=source==='Coach Timmy'?null:dressGolfer(this);if(fitted)fitToRig(this,fitted,this.outfit);const hand=model.getObjectByProperty('isBone',true) && [...this.basePose.keys()].find(b=>/RightHand$/.test(b.name));
+ installModel(model,source,fitted=null){if(this.model){this.club.removeFromParent();this.root.add(this.club);this.root.remove(this.model);this.mixer?.stopAllAction()}this.poses=new Map();this.model=model;this.model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material){const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>{m.roughness=Math.max(.42,m.roughness??.7);if(m.transparent)m.depthWrite=true})}}});const box=new THREE.Box3().setFromObject(model),size=box.getSize(new THREE.Vector3());model.scale.multiplyScalar(1.82/(size.y||1));const scaled=new THREE.Box3().setFromObject(model);model.position.y-=scaled.min.y;this.root.add(model);this.mixer=new THREE.AnimationMixer(model);this.actions.clear();this.basePose.clear();model.traverse(o=>{if(o.isBone)this.basePose.set(o,o.quaternion.clone())});this.outfit=fitted?fitToRig(this,fitted):null;const hand=model.getObjectByProperty('isBone',true) && [...this.basePose.keys()].find(b=>/RightHand$/.test(b.name));
  if(hand){
   hand.add(this.club);
   this.club.position.set(0,0,0);
@@ -98,7 +97,7 @@ export class Golfer{
  applyAppearance(palette={}) {
   Object.assign(this.appearance, palette);
   const colors=this.appearance;
-  for(const [key,material] of Object.entries(this.outfit||{})) if(colors[key]) material.color.set(colors[key]);
+  tintGolfer(this.outfit,colors);
   if(!this.model || !colors.skin) return;
   const shades = Object.fromEntries(['skin','shirt','pants'].map(key=>[key,new THREE.Color(colors[key])]));
   this.model.traverse(mesh=>{
