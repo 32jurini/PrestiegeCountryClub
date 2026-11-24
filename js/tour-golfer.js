@@ -14,7 +14,7 @@ function texture(name) {
 }
 export function loadFittedModel(frame) {
  if(!models.has(frame)){
-  const geometry=fetch(asset(frame+'.zip?v=teegear')).then(response=>{
+  const geometry=fetch(asset(frame+'.zip?v=ridge-range')).then(response=>{
    if(!response.ok)throw Error('Could not load golfer geometry');
    return response.arrayBuffer();
   }).then(bytes=>JSZip.loadAsync(bytes)).then(zip=>zip.file('mesh.json').async('string')).then(JSON.parse);
@@ -46,7 +46,8 @@ export function fitToRig(actor,[data,maps]) {
  const cap=new T.MeshStandardMaterial({color:0x213b45,roughness:.9,side:T.DoubleSide});
  const leather=new T.MeshStandardMaterial({color:0x433027,roughness:.65,side:T.DoubleSide});
  const buckle=new T.MeshStandardMaterial({color:0xb8b8ac,metalness:.55,roughness:.34,side:T.DoubleSide});
- const mesh=new T.SkinnedMesh(geometry,[skin,shirt,pants,shoes,eyes,brows,hair,cap,leather,buckle]);
+ const ponytail=new T.MeshStandardMaterial({roughness:.78,side:T.DoubleSide});
+ const mesh=new T.SkinnedMesh(geometry,[skin,shirt,pants,shoes,eyes,brows,hair,cap,leather,buckle,ponytail]);
  actor.model.traverse(o=>{if(o.isSkinnedMesh)o.visible=false});
  actor.root.add(mesh);actor.model.attach(mesh);actor.root.updateMatrixWorld(true);
  mesh.bind(new T.Skeleton(joints));mesh.normalizeSkinWeights();
@@ -60,7 +61,7 @@ export function fitToRig(actor,[data,maps]) {
   if(previous===undefined||position.getY(previous)>y)patches.set(key,i);
  }
  actor.soles={mesh,indices:[...patches.values()],point:new T.Vector3()};
- return {skin,shirt,pants,eyes,hair,brows};
+ return {skin,shirt,pants,eyes,hair,brows,ponytail};
 }
 
 export function tintGolfer(materials,colors) {
@@ -73,5 +74,6 @@ export function tintGolfer(materials,colors) {
   if(part==='eyes')c.lerp(new T.Color(0xffffff),.55);
   materials[part].color.copy(c);
  }
+ materials.ponytail.color.copy(materials.hair.color);
  materials.brows.color.copy(materials.hair.color);
 }

@@ -33,7 +33,7 @@ export function plantTrees(world, trees, species) {
 
 export function horizon(world) {
  const cols=230,rows=12,verts=[],colors=[],indices=[];
- const mountain=world.current==='summit';
+ const mountain=world.current==='summit'||world.current==='misty';
  for(let j=0;j<=rows;j++){
   for(let i=0;i<=cols;i++){
    const a=i/cols*Math.PI*2,t=j/rows,r=285+130*t;
@@ -119,6 +119,7 @@ export function frameHole(world) {
 
 // Cut the turf out of the bunker footprint even where neighboring terrain triangles span the lip.
 export function cutBunkers(material,holes) {
+ if(!holes.length)return;
  const previous=material.onBeforeCompile.bind(material);
  const key=material.customProgramCacheKey();
  material.onBeforeCompile=shader=>{
