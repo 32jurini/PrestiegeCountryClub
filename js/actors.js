@@ -1,5 +1,5 @@
-import {dressGolfer} from './outfit.js?v=club5';
-import {loadFittedModel,fitToRig} from './tour-golfer.js';
+import {dressGolfer} from './outfit.js?v=club5b';
+import {loadFittedModel,fitToRig} from './tour-golfer.js?v=club5b';
 import {measureShot} from './shot-pose.js';
 import * as THREE from 'three';
 import {FBXLoader} from 'three/addons/loaders/FBXLoader.js';

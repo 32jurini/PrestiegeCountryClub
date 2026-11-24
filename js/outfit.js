@@ -11,6 +11,7 @@ export function dressGolfer(actor) {
  const retain=(anchor,build)=>{
   const joint=bone(anchor);if(!joint)return;
   const group=new T.Group();actor.root.add(group);
+  group.name=anchor==='Head'?'Golfer cap':anchor;
   group.position.copy(actor.root.worldToLocal(joint.getWorldPosition(new T.Vector3())));
   const oval=(x,y,z,w,h,d,material)=>{
    const m=new T.Mesh(new T.SphereGeometry(1,24,16),material);

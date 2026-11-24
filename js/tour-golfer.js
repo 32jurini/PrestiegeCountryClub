@@ -29,6 +29,23 @@ export function fitToRig(actor,data,materials) {
  mesh.bind(new T.Skeleton(joints));mesh.normalizeSkinWeights();
  mesh.frustumCulled=false;mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData.fitted=true;
  const head=bones.find(b=>b.name.endsWith('Head'));
+ // Fit the crown to the fitted scalp before the swing changes the head pose.
+ const cap=head.getObjectByName('Golfer cap');
+ if(cap){
+  const positions=g.getAttribute('position');
+  let top=-Infinity;
+  for(let i=0;i<positions.count;i++)top=Math.max(top,positions.getY(i));
+  const skull=new T.Box3(),vertex=new T.Vector3();
+  for(let i=0;i<positions.count;i++){
+   vertex.fromBufferAttribute(positions,i);
+   if(vertex.y>top-.085)skull.expandByPoint(vertex);
+  }
+  const center=skull.getCenter(new T.Vector3());
+  actor.root.attach(cap);
+  cap.position.set(center.x,top-.222,center.z-.002);
+  cap.scale.set(1.04,1.02,1.10);
+  head.attach(cap);
+ }
  for(const [x,y,z] of data.eyes){
   for(const [offset,w,h,d,mat] of [[0,.013,.011,.013,materials.white],[.011,.006,.006,.003,materials.eyes],[.013,.003,.003,.002,materials.belt]]){
    const eye=new T.Mesh(new T.SphereGeometry(1,16,12),mat);
