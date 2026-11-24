@@ -40,3 +40,5 @@ body:not(.gated) #topbar,body:not(.gated) #bottomNav{pointer-events:auto}
 /* Show iron options and shot-shape controls only while an iron is equipped. */
 #ironBag:not(.iron-selected){display:none!important}
 #ironBag.iron-selected{display:block}
+
+.course-visual.misty{background:linear-gradient(145deg,#283f48,#9aaeb2 55%,#385f65);background-size:cover}.course-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}

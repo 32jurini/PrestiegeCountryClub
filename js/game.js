@@ -1,7 +1,7 @@
 import {contactTime} from './shot-pose.js?v=approach2';
 import {CLUB_IRONS,cycleIron,curveAcceleration} from './irons.js?v=irons1';
 import * as THREE from 'three';
-import {World,COURSES} from './world.js?v=teegear';
+import {World,COURSES} from './world.js?v=misty1';
 import {Golfer} from './actors.js?v=irons1';
 const clamp=THREE.MathUtils.clamp,$=id=>document.getElementById(id);
 const BALL_RADIUS = .029;
