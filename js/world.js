@@ -1,4 +1,5 @@
-import {plantTrees,horizon,detailSurface,frameHole,cutBunkers} from './course-detail.js?v=ridge-range';
+import {TreeContact} from './tree-contact.js';
+import {plantTrees,horizon,detailSurface,frameHole,cutBunkers} from './course-detail.js?v=canopy';
 import {extendCourses} from './full-round.js';
 import * as THREE from 'three';
 export const COURSES={royal:{name:'THE ROYAL CLASSIC',type:'parkland',sky:0x93bed0,fog:0xb4c5a7,grass:0x507849,rough:0x3e6140,fairway:0x7aa65e,trees:0x254b2b,wind:3,holes:[
@@ -77,11 +78,11 @@ export class World{
    object.geometry?.dispose();
    object.material?.dispose();
    if(object.isInstancedMesh)object.dispose();
-  });this.root=new THREE.Group();this.scene.add(this.root);this.current=name;this.holeIndex=idx;const c=COURSES[name], h=c.holes[idx];this.hole=h;this.length=h.route.at(-1)[0];this.scene.background=new THREE.Color(c.sky);
+  });this.root=new THREE.Group();this.scene.add(this.root);this.treeContact=new TreeContact();this.current=name;this.holeIndex=idx;const c=COURSES[name], h=c.holes[idx];this.hole=h;this.length=h.route.at(-1)[0];this.scene.background=new THREE.Color(c.sky);
  const dome=new THREE.Mesh(new THREE.SphereGeometry(820,40,20),new THREE.ShaderMaterial({
-  side:THREE.BackSide,depthWrite:false,uniforms:{horizon:{value:new THREE.Color(c.sky).lerp(new THREE.Color(0xffecc9),.42)},zenith:{value:new THREE.Color(0x518ac0)}},
+  side:THREE.BackSide,depthWrite:false,uniforms:{dusk:{value:name==='misty'?1:0},horizon:{value:new THREE.Color(c.sky).lerp(new THREE.Color(0xffecc9),.42)},zenith:{value:new THREE.Color(0x518ac0)}},
   vertexShader:'varying vec3 direction;void main(){direction=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
-  fragmentShader:`uniform vec3 horizon,zenith;varying vec3 direction;
+  fragmentShader:`uniform float dusk;uniform vec3 horizon,zenith;varying vec3 direction;
    float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
    float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+1.),f.x),f.y);}
    void main(){vec3 d=normalize(direction);float h=pow(max(d.y,0.),.55);
@@ -90,9 +91,17 @@ export class World{
    float cloud=.53*noise(p)+.27*noise(p*2.04)+.13*noise(p*4.13)+.07*noise(p*8.29);
    float veil=smoothstep(.48,.70,cloud)*smoothstep(.018,.16,d.y);
    gl_FragColor=vec4(mix(mix(horizon,zenith,h),vec3(.90,.92,.90),veil*.84)+vec3(.35,.25,.12)*glow,1.);
+   if(dusk>.5){
+    vec3 sunDir=normalize(vec3(-.34,.155,-1.));
+    float alignment=max(dot(d,sunDir),0.);
+    vec3 sky=mix(vec3(.88,.38,.19),vec3(.12,.12,.29),smoothstep(-.03,.68,d.y));
+    sky=mix(sky,vec3(.84,.42,.36),veil*.72);
+    sky+=vec3(.78,.34,.10)*pow(alignment,46.)+vec3(2.1,1.55,.80)*smoothstep(.99973,.99994,alignment);
+    gl_FragColor.rgb=sky;
+   }
    #include <colorspace_fragment>
    }`
- }));dome.renderOrder=-1;this.root.add(dome);this.scene.fog=new THREE.FogExp2(c.fog,name==='misty'?.0075:.0044);this.fairways=[];this.bunkers=[];this.water=[];const gmat=this.mat(c.grass);gmat.map=this.grassTexture;gmat.color.set(0xa7b78b);const terrain=new THREE.PlaneGeometry(750,650,300,260);terrain.rotateX(-Math.PI/2);const p=terrain.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i),z=p.getZ(i);p.setY(i,this.groundHeight(x,z))}if(name==='misty'){
+ }));dome.renderOrder=-1;this.root.add(dome);this.scene.fog=new THREE.FogExp2(name==='misty'?0xc49c9f:c.fog,name==='misty'?.0105:.0044);this.fairways=[];this.bunkers=[];this.water=[];const gmat=this.mat(c.grass);gmat.map=this.grassTexture;gmat.color.set(0xa7b78b);const terrain=new THREE.PlaneGeometry(750,650,300,260);terrain.rotateX(-Math.PI/2);const p=terrain.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i),z=p.getZ(i);p.setY(i,this.groundHeight(x,z))}if(name==='misty'){
   const shades=[],low=new THREE.Color(0xffffff),granite=new THREE.Color(0xabada6),tint=new THREE.Color();
   for(let i=0;i<p.count;i++){
    const x=p.getX(i),z=p.getZ(i),rise=p.getY(i)-this.station(z,3);

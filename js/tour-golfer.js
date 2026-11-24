@@ -14,7 +14,7 @@ function texture(name) {
 }
 export function loadFittedModel(frame) {
  if(!models.has(frame)){
-  const geometry=fetch(asset(frame+'.zip?v=full18')).then(response=>{
+  const geometry=fetch(asset(frame+'.zip?v=canopy')).then(response=>{
    if(!response.ok)throw Error('Could not load golfer geometry');
    return response.arrayBuffer();
   }).then(bytes=>JSZip.loadAsync(bytes)).then(zip=>zip.file('mesh.json').async('string')).then(JSON.parse);

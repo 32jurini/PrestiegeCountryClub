@@ -1,4 +1,4 @@
-import {loadFittedModel,fitToRig,tintGolfer} from './tour-golfer.js?v=full18';
+import {loadFittedModel,fitToRig,tintGolfer} from './tour-golfer.js?v=canopy';
 import {measureShot,contactTime} from './shot-pose.js?v=approach2';
 import * as THREE from 'three';
 import {FBXLoader} from 'three/addons/loaders/FBXLoader.js';
@@ -39,14 +39,42 @@ export class Golfer{
   shaft.position.y=-.5;
   const grip=new THREE.Mesh(new THREE.CylinderGeometry(.019,.015,.24,16),new THREE.MeshStandardMaterial({color:0x25322f}));
   grip.position.y=-.10;
-  this.clubHead=new THREE.Mesh(new THREE.SphereGeometry(1,18,12),metal.clone());this.driverGeometry=this.clubHead.geometry;const blade=new THREE.Shape();blade.moveTo(-.90,-.33);blade.lineTo(.73,-.37);blade.quadraticCurveTo(1.03,-.28,.94,.20);blade.quadraticCurveTo(.80,.44,.44,.42);blade.lineTo(-.72,.22);blade.quadraticCurveTo(-.97,.08,-.90,-.33);this.ironGeometry=new THREE.ExtrudeGeometry(blade,{depth:.16,bevelEnabled:true,bevelSegments:2,steps:1,bevelSize:.035,bevelThickness:.025});this.ironGeometry.computeVertexNormals();
+  this.clubHead=new THREE.Mesh(new THREE.SphereGeometry(1,18,12),metal.clone());this.driverGeometry=this.clubHead.geometry;
+  // Cast blade with a rounded toe and a lower heel at the hosel.
+  const blade=new THREE.Shape();
+  blade.moveTo(-.052,-.016);blade.quadraticCurveTo(-.06,-.023,-.041,-.023);
+  blade.lineTo(.049,-.020);blade.quadraticCurveTo(.065,-.017,.062,.004);
+  blade.quadraticCurveTo(.06,.032,.044,.031);blade.lineTo(-.041,.012);
+  blade.quadraticCurveTo(-.055,.008,-.052,-.016);
+  this.ironGeometry=new THREE.ExtrudeGeometry(blade,{depth:.012,bevelEnabled:true,bevelSegments:3,steps:1,bevelSize:.002,bevelThickness:.002});
+  this.bladeDetail=new THREE.Group();this.clubHead.add(this.bladeDetail);
+  const grooves=[];
+  for(let row=0;row<6;row++){
+   const y=-.014+row*.005;grooves.push(-.036,y,.0142,.047,y,.0142);
+  }
+  const lines=new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(grooves,3));
+  this.bladeDetail.add(new THREE.LineSegments(lines,new THREE.LineBasicMaterial({color:0x677478})));
+  const heel=new THREE.Vector3(-.046,-.996,.002),join=new THREE.Vector3(0,-.954,0);
+  const neck=new THREE.Mesh(new THREE.CylinderGeometry(.006,.009,heel.distanceTo(join),12),metal);
+  neck.position.copy(heel).lerp(join,.5);neck.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),join.clone().sub(heel).normalize());
+  this.hosel=neck;this.club.add(neck);this.bladeDetail.visible=neck.visible=false;
   this.clubHead.scale.set(.09,.045,.07);
   this.clubHead.position.y=-1;
   this.club.add(shaft,grip,this.clubHead);
   this.root.add(this.club);
  }
  setClub(type) {
-  const iron=/^iron[3-9]$/.test(type);this.clubHead.geometry=iron?this.ironGeometry:this.driverGeometry;this.clubHead.rotation.set(0,0,0);if(iron){this.clubHead.scale.set(.12,.15,.25);this.clubHead.rotation.z=(Number(type.slice(-1))-3)*.045;this.clubHead.material.color.set(0xc9d5d8);this.clubHead.material.metalness=.91;this.clubHead.material.roughness=.17;}else{this.clubHead.scale.set(type==='driver'?.095:.078,type==='putter'?.022:.044,type==='driver'?.075:.035);this.clubHead.material.color.set(type==='putter'?0x697b83:0xb6c6c8);this.clubHead.material.metalness=.7;this.clubHead.material.roughness=.28;}
+  const iron=/^iron[3-9]$/.test(type);
+  const wedge=['pitching','approach','wedge','lob'].includes(type);
+  const blade=iron||wedge;
+  this.clubHead.geometry=blade?this.ironGeometry:this.driverGeometry;
+  this.bladeDetail.visible=this.hosel.visible=blade;
+  this.clubHead.rotation.set(blade?-(iron?.23+.045*(Number(type.slice(-1))-3):.71):0,0,0);
+  if(blade)this.clubHead.scale.setScalar(1);
+  else if(type==='putter')this.clubHead.scale.set(.065,.018,.028);
+  else this.clubHead.scale.setScalar(type==='wood'?.77:1).multiply(new THREE.Vector3(.095,.044,.075));
+  this.clubHead.material.color.set(blade?0xc8d2d6:type==='putter'?0x697b83:0x687781);
+  this.clubHead.material.metalness=blade?.72:.58;this.clubHead.material.roughness=blade?.29:.31;
  }
  groundShoes() {
   if(!this.soles||!this.stanceGround)return;

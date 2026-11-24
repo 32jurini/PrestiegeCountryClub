@@ -13,6 +13,11 @@ function foliage(species) {
 export function plantTrees(world, trees, species) {
  if (!trees.length) return;
  const material = new THREE.MeshStandardMaterial({map:foliage(species),alphaTest:.45,side:THREE.DoubleSide,roughness:1});
+ // Let the upper foliage catch more sky light than the sheltered lower branches.
+ material.onBeforeCompile=shader=>{
+  shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',
+   '#include <map_fragment>\n diffuseColor.rgb*=mix(vec3(.84,.88,.83),vec3(1.07,1.06,.99),smoothstep(.22,.92,vMapUv.y));');
+ };
  const geometry = new THREE.PlaneGeometry(1,1);
  geometry.translate(0,.5,0);
  const stand = new THREE.InstancedMesh(geometry,material,trees.length*3);
@@ -20,6 +25,7 @@ export function plantTrees(world, trees, species) {
  const tint = new THREE.Color();
  trees.forEach(([x,z,height,seed],i)=>{
   transform.position.set(x,world.groundHeight(x,z)-.12,z);
+  world.treeContact.add(x,transform.position.y,z,height,species);
   transform.scale.set(height*(species==='pine'?.50:.88),height,1);
   for(let face=0;face<3;face++){
    transform.rotation.y=seed*3+face*Math.PI/3;
