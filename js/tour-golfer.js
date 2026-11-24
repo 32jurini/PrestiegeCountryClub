@@ -29,9 +29,24 @@ export function fitToRig(actor,data,materials) {
   const blend=T.MathUtils.smoothstep(y,neckY-.06,neckY+.12);
   positions.setXYZ(i,x,y-.048*blend,positions.getZ(i)-.028*blend);
  }
+ // The cap band and polo neckline follow the same skinned surface as the head and shoulders.
+ const groups=data.groups.map(group=>group.slice());
+ const exposed=groups[0];groups[0]=[];
+ let crown=-Infinity;
+ for(let i=0;i<positions.count;i++)crown=Math.max(crown,positions.getY(i));
+ for(let i=0;i<exposed.length;i+=3){
+  const a=exposed[i],b=exposed[i+1],c=exposed[i+2];
+  const y=(positions.getY(a)+positions.getY(b)+positions.getY(c))/3;
+  const z=(positions.getZ(a)+positions.getZ(b)+positions.getZ(c))/3;
+  const x=(positions.getX(a)+positions.getX(b)+positions.getX(c))/3;
+  let region=0;
+  if(y>crown-.063+z*.14)region=3;
+  else if(Math.abs(x)<.17 && y>neckY-.09 && y<neckY+.023-z*.32)region=1;
+  groups[region].push(a,b,c);
+ }
  let offset=0;
- for(const [i,group] of data.groups.entries()){if(group.length)g.addGroup(offset,group.length,i);offset+=group.length}
- g.setIndex(data.groups.flat());g.computeVertexNormals();
+ for(const [i,group] of groups.entries()){if(group.length)g.addGroup(offset,group.length,i);offset+=group.length}
+ g.setIndex(groups.flat());g.computeVertexNormals();
  const mesh=new T.SkinnedMesh(g,[materials.skin,materials.shirt,materials.pants,materials.belt,materials.lips]);
  actor.model.traverse(o=>{if(o.isSkinnedMesh)o.visible=false});
  actor.root.add(mesh);actor.model.attach(mesh);actor.root.updateMatrixWorld(true);
