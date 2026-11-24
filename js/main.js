@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {GolfGame} from './game.js?v=bagwalk';
+import {GolfGame} from './game.js?v=lift';
 import {SoundEngine} from './sound.js';
 const $=id=>document.getElementById(id);
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(window.devicePixelRatio,1.6));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;$('viewport').appendChild(renderer.domElement);
@@ -44,7 +44,13 @@ $('bagContents').addEventListener('click',event=>{
  const button=event.target.closest('[data-pick]');
  if(button)game.returnFromBag(button.dataset.pick);
 });
-renderer.domElement.addEventListener('click',event=>game.pickBagHead(event));
+renderer.domElement.addEventListener('pointermove',event=>{
+ if(game.bagPhase==='select')game.highlightBagClub(game.clubUnderPointer(event));
+});
+renderer.domElement.addEventListener('pointerleave',()=>game.highlightBagClub(null));
+renderer.domElement.addEventListener('click',event=>{
+ const club=game.clubUnderPointer(event);if(club)game.returnFromBag(club);
+});
 document.querySelectorAll('[data-shape]').forEach(b=>b.onclick=()=>game.setShape(b.dataset.shape));
 const saved=(()=>{try{return JSON.parse(localStorage.getItem('prestiege-golfer'))||{}}catch{return {}}})();$('golferName').value=saved.name||'ROOKIE';$('golferFrame').value=saved.frame||'male';$('shirtColor').value=saved.shirt||'#e9f0e9';$('hairColor').value=saved.hair||'#36261f';$('eyeColor').value=saved.eyes||'#4c8069';$('skinColor').value=saved.skin||'#ba8c70';$('pantsColor').value=saved.pants||'#1d3535';
 const palette=()=>({shirt:$('shirtColor').value,pants:$('pantsColor').value,hair:$('hairColor').value,eyes:$('eyeColor').value,skin:$('skinColor').value});

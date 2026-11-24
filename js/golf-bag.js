@@ -26,13 +26,13 @@ export function buildBag(){
  mesh(new T.BoxGeometry(.43,.015,.012),trim,0,.855,0);
  const clubs=bagSections.flatMap(([,ids])=>ids);
  clubs.forEach((id,i)=>{
-  const row=Math.floor(i/4),col=i%4,x=(col-1.5)*.076,z=(row-1.5)*.067;
-  const wood=i<3,top=1.22-row*.081+(col%2)*.032+(wood?.08:0);
+  const row=Math.floor(i/4),col=i%4,x=(col-1.5)*.095,z=(row-1.5)*.067;
+  const wood=i<3,top=1.22-row*.081+(col%2)*.009+(wood?.08:0);
   const shaft=mesh(new T.CylinderGeometry(.004,.005,top-.84,8),steel,x,(top+.84)/2,z);
   shaft.rotation.z=-x*.34;
   const head=mesh(new T.SphereGeometry(1,16,10),wood?leather:steel,x+x*.11,top,z);
   head.scale.set(wood?.051:.039,wood?.031:.019,wood?.038:.012);
-  head.rotation.z=wood?-.18:.34;head.userData.club=id;head.userData.shaft=shaft;heads.push(head);
+  head.rotation.z=wood?-.18:.34;head.userData.club=id;head.userData.shaft=shaft;head.userData.restY=top;head.userData.shaftY=shaft.position.y;heads.push(head);
  });
  bag.visible=false;return {bag,heads};
 }

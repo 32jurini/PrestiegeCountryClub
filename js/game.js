@@ -1,10 +1,12 @@
-import {buildBag,bagSections} from './golf-bag.js';
+import {buildBag} from './golf-bag.js?v=lift';
 import {contactTime} from './shot-pose.js?v=approach2';
 import {CLUB_IRONS,curveAcceleration} from './irons.js?v=irons1';
 import * as THREE from 'three';
 import {World,COURSES} from './world.js?v=canopy';
 import {Golfer} from './actors.js?v=bagwalk';
 const clamp=THREE.MathUtils.clamp,$=id=>document.getElementById(id);
+const SHAPES=['HOOK','DRAW','STRAIGHT','FADE','SLICE'];
+const BAG_TAGS={driver:'Driver',wood:'3W',hybrid:'4H',pitching:'PW',approach:'AW',wedge:'SW',lob:'LW',putter:'Putter'};
 const BALL_RADIUS = .029;
 const CLUBS={driver:{name:'DRIVER',speed:43,loft:.395,range:255},wood:{name:'3 WOOD',speed:39.8,loft:.42,range:228},hybrid:{name:'4 HYBRID',speed:42.2,loft:.315,range:191},...CLUB_IRONS,
  pitching:{name:'PITCHING WEDGE',speed:26,loft:.57,range:112,wedge:true},
@@ -65,7 +67,7 @@ export class GolfGame{
    velocity.x *= drag;
    velocity.z *= drag;
   }
-  if (airborne){velocity.x += this.wind*.18*dt;{const lateral=curveAcceleration(this.flightShape,velocity);velocity.x+=lateral.x*dt;velocity.z+=lateral.z*dt;}}
+  if (airborne){velocity.x += this.wind*.18*dt;if(this.club!=='putter'){const lateral=curveAcceleration(this.flightShape,velocity);velocity.x+=lateral.x*dt;velocity.z+=lateral.z*dt;}}
   velocity.y -= (driving ? 6.4 : 9.81) * dt;
   if(!this.world.treeContact?.deflect(position,velocity,dt))position.addScaledVector(velocity,dt);
  }
@@ -88,7 +90,7 @@ export class GolfGame{
   marker.position.copy(point);
   marker.position.y += .07;
   const carry = Math.round(Math.hypot(point.x-this.position.x,point.z-this.position.z)*1.75);
-  $('shotPreviewText').textContent = CLUBS[this.club].name + ' · ' + carry + ' YDS CARRY · ' + (this.shotShape<0?'DRAW':this.shotShape>0?'FADE':'STRAIGHT') + ' · ' + Math.round(this.aim) + '° AIM';
+  $('shotPreviewText').textContent = CLUBS[this.club].name + ' · ' + carry + ' YDS CARRY · ' + SHAPES[this.shotShape+2] + ' · ' + Math.round(this.aim) + '° AIM';
  }
  enterMenu(){this.clearBag();this.started=false;this.previewMode=false;this.shotPreview.group.visible=false;this.world.create('royal',0);this.ball.visible=false;this.golfer.setVisible(false);this.coachActor?.setVisible(false);this.camera.position.set(39,37,110);this.camera.lookAt(-4,3,-45)}
  enterPreview(){this.golfer.stanceGround=null;this.previewMode=true;this.golfer.club.visible=false;this.golfer.setVisible(true);this.golfer.root.position.set(0,this.world.ground(0,67),67);this.golfer.root.rotation.set(0,Math.PI,0);this.golfer.animate('idle',true)}
@@ -115,7 +117,7 @@ export class GolfGame{
  }
  notify(t){$('banner').textContent=t}
  clearBag(){
-  this.bagPhase=null;
+  this.resetBagLift();this.bagPhase=null;
   if(this.bag)this.bag.visible=false;
   const panel=$('bagPanel');if(panel)panel.hidden=true;
   document.body?.classList.remove('at-bag');
@@ -145,17 +147,72 @@ export class GolfGame{
  }
  returnFromBag(id){
   if(this.bagPhase!=='select'||!CLUBS[id])return;
-  this.club=id;if(id==='putter')this.shotShape=this.flightShape=0;
+  this.resetBagLift();this.club=id;if(id==='putter')this.shotShape=this.flightShape=0;
   this.golfer.setClub(id);this.golfer.club.visible=true;this.showBagClubs(id);this.bagPhase='back';this.walkTarget=this.addressPoint;
   $('bagPanel').hidden=true;this.golfer.animate('walk',true);
   this.notify(CLUBS[id].name+' · RETURNING TO BALL');
  }
- pickBagHead(event){
-  if(this.bagPhase!=='select')return;
+ resetBagLift(){
+  this.hoverClub=null;
+  for(const head of this.bagHeads){
+   head.position.y=head.userData.restY;
+   head.userData.shaft.position.y=head.userData.shaftY;
+  }
+ }
+ inspectBag(){
+  const contents=$('bagContents');contents.replaceChildren();
+  this.clubTags=new Map();
+  for(const head of this.bagHeads){
+   const id=head.userData.club,tag=document.createElement('button');
+   tag.dataset.pick=id;tag.textContent=BAG_TAGS[id]||id.slice(4)+'I';
+   tag.setAttribute('aria-label',CLUBS[id].name);tag.title=CLUBS[id].name;
+   tag.onpointerenter=tag.onfocus=()=>this.highlightBagClub(id);
+   tag.onpointerleave=tag.onblur=()=>this.highlightBagClub(null);
+   contents.append(tag);this.clubTags.set(id,tag);
+  }
+ }
+ highlightBagClub(id){
+  if(this.bagPhase!=='select'||this.hoverClub===id)return;
+  this.hoverClub=id;
+  this.notify(id?CLUBS[id].name:'CHOOSE A CLUB');
+  for(const [club,tag] of this.clubTags)tag.classList.toggle('lifted',club===id);
+ }
+ clubUnderPointer(event){
+  if(this.bagPhase!=='select')return null;
   const rect=this.renderer.domElement.getBoundingClientRect();
   const pointer=new THREE.Vector2((event.clientX-rect.left)/rect.width*2-1,1-(event.clientY-rect.top)/rect.height*2);
   const ray=new THREE.Raycaster();ray.setFromCamera(pointer,this.camera);
-  const hit=ray.intersectObjects(this.bagHeads,false)[0];if(hit)this.returnFromBag(hit.object.userData.club);
+  const hits=ray.intersectObjects(this.bagHeads.flatMap(h=>[h,h.userData.shaft]),false);
+  if(hits.length){
+   const item=hits[0].object;
+   return this.bagHeads.find(h=>h===item||h.userData.shaft===item).userData.club;
+  }
+  // Keep the original head position selectable while it lifts away from the pointer.
+  if(this.hoverClub){
+   const head=this.bagHeads.find(h=>h.userData.club===this.hoverClub);
+   const lift=head.position.y-head.userData.restY;
+   // Test the resting silhouette too, including clicks near the edge of the head.
+   ray.ray.origin.y+=lift;
+   if(ray.intersectObjects([head,head.userData.shaft],false).length)return this.hoverClub;
+  }
+  return null;
+ }
+ displayBag(dt){
+  const spot=this.bag.position;
+  const distance=Math.max(.72,.53/this.camera.aspect);
+  const target=spot.clone().add(new THREE.Vector3(0,1.15,0));
+  this.camera.position.copy(target).addScaledVector(new THREE.Vector3(0,.72,.70),distance);
+  this.camera.lookAt(target);this.camera.updateMatrixWorld();
+  for(const head of this.bagHeads){
+   const {club,restY,shaft,shaftY}=head.userData;
+   const lift=THREE.MathUtils.lerp(head.position.y-restY,this.hoverClub===club?.065:0,1-Math.exp(-dt*16));
+   head.position.y=restY+lift;shaft.position.y=shaftY+lift;
+   const anchor=head.position.clone();anchor.y=restY-.022;
+   this.bag.localToWorld(anchor).project(this.camera);
+   const tag=this.clubTags.get(club);
+   tag.style.left=((anchor.x+1)*50)+'%';tag.style.top=((1-anchor.y)*50)+'%';
+  }
+  this.bag.updateMatrixWorld(true);
  }
  updateBag(dt){
   const root=this.golfer.root,spot=this.bag.position;
@@ -173,16 +230,17 @@ export class GolfGame{
     }
     this.bagPhase='select';this.showBagClubs(null);root.rotation.y=Math.atan2(spot.x-root.position.x,spot.z-root.position.z);
     this.golfer.animate('idle',true);$('bagPanel').hidden=false;
-    $('bagContents').innerHTML=bagSections.map(([title,ids])=>`<section><h3>${title}</h3><div>${ids.map(id=>`<button data-pick="${id}" aria-pressed="${id===this.club}">${CLUBS[id].name}</button>`).join('')}</div></section>`).join('');
+    this.inspectBag();
     this.notify('CHOOSE A CLUB');
    }
   }
+  if(this.bagPhase==='select'){this.displayBag(dt);return}
   const target=root.position.clone().lerp(spot,.52);target.y+=.91;
   const eye=target.clone().add(new THREE.Vector3(.35,.64,2.55));
   this.camera.position.lerp(eye,1-Math.exp(-dt*5));this.camera.lookAt(target);
  }
  chooseClub(c){if(!CLUBS[c]||this.swinging||this.modal||this.bagPhase)return;this.club=c;if(c==='putter')this.shotShape=this.flightShape=0;this.golfer.setClub(c);this.placeGolfer();this.refresh()}
- setShape(shape){if(this.club==='putter'||this.swinging||this.modal||this.bagPhase)return;this.shotShape=Math.max(-1,Math.min(1,Number(shape)||0));this.refresh()}
+ setShape(shape){if(this.club==='putter'||this.swinging||this.modal||this.bagPhase)return;this.shotShape=Math.max(-2,Math.min(2,Math.round(Number(shape)||0)));this.refresh()}
  aimDelta(d){if(this.bagPhase||this.swinging||this.modal)return;this.aim=clamp(this.aim+d,-65,65);this.placeGolfer();this.refresh()}
  refresh(){const c=CLUBS[this.club];$('clubLabel').textContent=c.name;$('windLabel').textContent=`${this.wind>0?'↗':'↖'} ${Math.abs(this.wind*2.2).toFixed(0)} MPH`;$('strokeLabel').textContent=this.shots+1;const completedScore=this.scores.reduce((sum,strokes,i)=>sum+strokes-COURSES[this.course].holes[i].par,0);$('scoreLabel').textContent=completedScore===0?'E':completedScore>0?'+'+completedScore:String(completedScore);$('aimLabel').textContent=`${Math.round(this.aim)}°`;$('lieLabel').textContent=this.world.lie(this.position.x,this.position.z);$('distanceLabel').textContent=`${Math.round(this.position.distanceTo(this.world.holePosition)*1.75)} YDS TO PIN`;if(this.course==='range')$('distanceLabel').textContent='50–250 YD TARGETS';$('powerLabel').textContent=`${Math.round(this.charge*100)}%`;$('meterBar').style.width=`${this.charge*100}%`;const shapes=document.querySelector('.iron-shape');if(shapes)shapes.hidden=this.club==='putter';
  document.querySelectorAll('[data-shape]').forEach(b=>b.classList.toggle('active',Number(b.dataset.shape)===this.shotShape));this.updateShotPreview()}

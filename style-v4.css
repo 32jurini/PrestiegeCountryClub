@@ -50,12 +50,10 @@ body:not(.gated) #topbar,body:not(.gated) #bottomNav{pointer-events:auto}
 #openBag{margin-top:8px;pointer-events:auto}
 .iron-shape[hidden],#bagPanel[hidden]{display:none}
 .at-bag .game-bottom,.at-bag .shot-indicator,.at-bag .game-footer{visibility:hidden}
-#bagPanel{position:absolute;z-index:9;right:2vw;top:50%;transform:translateY(-50%);width:min(300px,36vw);max-height:74vh;overflow:auto;padding:16px;background:#10271ff5;color:#f1efdf;border:1px solid #677a65}
-#bagPanel header{display:flex;align-items:center;justify-content:space-between}
-#bagPanel h2,#bagPanel h3{margin:0;font-family:Oswald,sans-serif}
-#bagPanel h2{font-size:22px;text-transform:uppercase}
-#bagPanel h3{font-size:13px;color:#ddc995;margin:8px 0 4px}
-#bagContents section div{display:flex;flex-wrap:wrap;gap:4px}
-#bagPanel button{background:#264239;border:1px solid #52695c;color:#f1efdf;padding:4px 8px;cursor:pointer;font:600 12px Oswald,sans-serif}
-#bagPanel button:hover,#bagPanel button[aria-pressed=true]{background:#dbc998;color:#14271c}
-@media(max-width:650px){#bagPanel{width:48vw;max-height:62vh;right:1vw;padding:9px}}
+#bagPanel{position:absolute;inset:0;z-index:9;pointer-events:none}
+#bagContents button,#closeBag{position:absolute;pointer-events:auto;cursor:pointer;color:#fff9e9;background:#122720e8;border:1px solid #97a38b;font:600 clamp(10px,1vw,15px) Oswald,sans-serif}
+#bagContents button{transform:translateX(-50%);padding:1px 5px;line-height:1.35;border-radius:3px;white-space:nowrap}
+#bagContents button.lifted,#bagContents button:focus-visible{color:#10251c;background:#efd994}
+#closeBag{right:3vw;bottom:5vh;padding:8px 14px}
+body:has(#bagPanel:not([hidden])) .game-top{visibility:hidden}
+body:has(#bagPanel:not([hidden])) .game-banner{top:3vh}
