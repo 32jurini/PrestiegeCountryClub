@@ -1,4 +1,5 @@
 import {plantTrees,horizon,detailSurface,frameHole,cutBunkers} from './course-detail.js?v=ridge-range';
+import {extendCourses} from './full-round.js';
 import * as THREE from 'three';
 export const COURSES={royal:{name:'THE ROYAL CLASSIC',type:'parkland',sky:0x93bed0,fog:0xb4c5a7,grass:0x507849,rough:0x3e6140,fairway:0x7aa65e,trees:0x254b2b,wind:3,holes:[
  {"name":"Orchard Bend","par":4,"hint":"Favor the left landing area to open the turn.","route":[[0,0,10,0],[55,-13,20,0],[118,-37,16,0],[184,8,9,0]],"green":[11,10],"sand":[[-12,112,9,12],[0,174,5,4]],"water":[]},
@@ -19,6 +20,7 @@ misty:{name:'MISTY PINNACLE',type:'mountain',sky:0xa0b0b6,fog:0xaebdc1,grass:0x4
 {name:'Alpine Saddle',par:3,hint:'Play a controlled 9 iron downhill to the sheltered green.',route:[[0,0,10,24],[12,0,12,24],[50,-5,15,17],[78,-9,12,12],[92,-9,10,12]],green:[10,9],sand:[],water:[]},
 {name:'Granite Pass',par:4,hint:'Follow the narrow ridge and aim for the shelf below the peak.',route:[[0,0,10,22],[65,-15,14,25],[130,10,12,20],[195,20,8,16]],green:[9,10],sand:[[24,130,5,7]],water:[]}
 ]}};
+extendCourses(COURSES);
 COURSES.range={...COURSES.royal,name:'DRIVING RANGE',wind:0,holes:[{
  name:'Practice tee',par:0,hint:'Pick a club and aim at a yardage marker.',
  route:[[0,0,30,0],[185,0,42,0]],green:[4,4],sand:[],water:[]

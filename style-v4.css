@@ -42,3 +42,5 @@ body:not(.gated) #topbar,body:not(.gated) #bottomNav{pointer-events:auto}
 #ironBag.iron-selected{display:block}
 
 .course-visual.misty{background:linear-gradient(145deg,#283f48,#9aaeb2 55%,#385f65);background-size:cover}.course-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}
+
+#scorecard table{width:100%;border-collapse:collapse;letter-spacing:0;font-variant-numeric:tabular-nums;margin:.6rem 0}#scorecard caption{text-align:left;color:#f2ebd9}#scorecard th,#scorecard td{padding:.15rem;border-bottom:1px solid #496055;text-align:center}#scorecard th:first-child{text-align:left}#roundModal>div{max-height:94dvh;overflow-y:auto;box-sizing:border-box}@media(max-width:540px){#roundModal>div{padding:20px}}

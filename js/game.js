@@ -1,8 +1,8 @@
 import {contactTime} from './shot-pose.js?v=approach2';
 import {CLUB_IRONS,cycleIron,curveAcceleration} from './irons.js?v=irons1';
 import * as THREE from 'three';
-import {World,COURSES} from './world.js?v=ridge-range';
-import {Golfer} from './actors.js?v=ridge-range';
+import {World,COURSES} from './world.js?v=full18';
+import {Golfer} from './actors.js?v=full18';
 const clamp=THREE.MathUtils.clamp,$=id=>document.getElementById(id);
 const BALL_RADIUS = .029;
 const CLUBS={driver:{name:'DRIVER',speed:43,loft:.395,range:255},...CLUB_IRONS,wedge:{name:'WEDGE',speed:21,loft:.78,range:75},putter:{name:'PUTTER',speed:11,loft:.015,range:35}};
@@ -146,8 +146,19 @@ export class GolfGame{
   this.camera.lookAt(this.cameraTarget);
  }
  menuCamera(dt){if(this.previewMode){const target=this.golfer.root.position.clone().add(new THREE.Vector3(0,1,0)),desired=target.clone().add(new THREE.Vector3(.25,.15,2.7));this.camera.position.lerp(desired,Math.min(1,dt*4));this.camera.lookAt(target);this.golfer.root.rotation.y=Math.sin(performance.now()*.00025)*.24;return}const t=performance.now()*.0001,desired=new THREE.Vector3(36+Math.sin(t)*16,30,-5+Math.cos(t)*35);this.camera.position.lerp(desired,dt*.4);this.camera.lookAt(this.world.holePosition.clone().lerp(this.world.teePosition,.42).add(new THREE.Vector3(0,3,0)))}
- finishHole(){this.onSfx('cup');this.shotPreview.group.visible=false;this.swinging=false;this.charging=false;this.modal=true;this.scores.push(this.shots);const par=this.world.hole.par,d=this.shots-par;let title=d===-3?'ALBATROSS':d===-2?'EAGLE':d===-1?'BIRDIE':d===0?'PAR':d===1?'BOGEY':d===2?'DOUBLE BOGEY':`${d>0?'+':''}${d}`;if(this.shots===1)title='HOLE IN ONE';$('roundEyebrow').textContent='HOLE COMPLETE';$('roundTitle').textContent=title;$('roundDescription').textContent=`${this.shots} STROKES · PAR ${par} · ${COURSES[this.course].name}`;$('scorecard').textContent=this.scores.map((s,i)=>`H${i+1} ${s}`).join(' • ');$('nextHole').textContent=this.index===2?'VIEW FINAL SCORE →':'NEXT HOLE →';$('roundModal').classList.remove('hidden');if(d<0)this.golfer.shot('cheer')}
- next(){if(this.index<2){this.startHole(this.index+1);return}const total=this.scores.reduce((a,b)=>a+b,0),par=COURSES[this.course].holes.reduce((a,b)=>a+b.par,0),diff=total-par;$('roundEyebrow').textContent='ROUND COMPLETE';$('roundTitle').textContent=diff===0?'EVEN PAR':diff>0?`+${diff}`:String(diff);$('roundDescription').textContent=`${total} TOTAL STROKES · ${COURSES[this.course].name}`;$('scorecard').textContent=this.scores.map((s,i)=>`HOLE ${i+1}: ${s}`).join(' / ');$('nextHole').textContent='PLAY AGAIN ↻';this.index=3;const key='prestiege-records';try{const records=JSON.parse(localStorage.getItem(key)||'[]');records.push({course:this.course,total,par,date:new Date().toISOString()});localStorage.setItem(key,JSON.stringify(records.slice(-50)))}catch{}}
- actionNext(){if(this.index===3){this.begin(this.course);return}this.next()}
+ renderScorecard(){
+  const groups=[this.scores.slice(0,9),this.scores.slice(9)];
+  $('scorecard').innerHTML=groups.map((scores,half)=>{
+   if(!scores.length)return '';
+   const offset=half*9;
+   const numbers=scores.map((_,i)=>`<th scope="col">${offset+i+1}</th>`).join('');
+   const strokes=scores.map(score=>`<td>${score}</td>`).join('');
+   const sum=scores.reduce((total,score)=>total+score,0);
+   return `<table><caption>${half?'Back nine':'Front nine'}</caption><thead><tr><th>Hole</th>${numbers}<th>Total</th></tr></thead><tbody><tr><th scope="row">Strokes</th>${strokes}<td>${sum}</td></tr></tbody></table>`;
+  }).join('');
+ }
+ finishHole(){this.onSfx('cup');this.shotPreview.group.visible=false;this.swinging=false;this.charging=false;this.modal=true;this.scores.push(this.shots);const par=this.world.hole.par,d=this.shots-par;let title=d===-3?'ALBATROSS':d===-2?'EAGLE':d===-1?'BIRDIE':d===0?'PAR':d===1?'BOGEY':d===2?'DOUBLE BOGEY':`${d>0?'+':''}${d}`;if(this.shots===1)title='HOLE IN ONE';$('roundEyebrow').textContent='HOLE COMPLETE';$('roundTitle').textContent=title;$('roundDescription').textContent=`${this.shots} STROKES · PAR ${par} · ${COURSES[this.course].name}`;this.renderScorecard();$('nextHole').textContent=this.index===COURSES[this.course].holes.length-1?'VIEW FINAL SCORE →':'NEXT HOLE →';$('roundModal').classList.remove('hidden');if(d<0)this.golfer.shot('cheer')}
+ next(){if(this.index+1<COURSES[this.course].holes.length){this.startHole(this.index+1);return}const total=this.scores.reduce((a,b)=>a+b,0),par=COURSES[this.course].holes.reduce((a,b)=>a+b.par,0),diff=total-par;$('roundEyebrow').textContent='ROUND COMPLETE';$('roundTitle').textContent=diff===0?'EVEN PAR':diff>0?`+${diff}`:String(diff);$('roundDescription').textContent=`${total} TOTAL STROKES · ${COURSES[this.course].name}`;this.renderScorecard();$('nextHole').textContent='PLAY AGAIN ↻';this.index=COURSES[this.course].holes.length;const key='prestiege-records';try{const records=JSON.parse(localStorage.getItem(key)||'[]');records.push({course:this.course,total,par,date:new Date().toISOString()});localStorage.setItem(key,JSON.stringify(records.slice(-50)))}catch{}}
+ actionNext(){if(this.index===COURSES[this.course].holes.length){this.begin(this.course);return}this.next()}
  listeners(){window.addEventListener('keydown',e=>{if(!this.started||this.modal||e.target.matches('input,select'))return;if(['Space','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();if(e.code==='Space'&&!e.repeat)this.startCharge();if(e.code==='ArrowLeft'||e.code==='KeyA')this.aimDelta(-2);if(e.code==='ArrowRight'||e.code==='KeyD')this.aimDelta(2);if(/^Digit[1-4]$/.test(e.code))this.chooseClub(['driver','iron','wedge','putter'][Number(e.code.slice(-1))-1]);if(e.code==='BracketLeft')this.cycleIron(-1);if(e.code==='BracketRight')this.cycleIron(1);if(e.code==='KeyZ')this.setShape(-1);if(e.code==='KeyX')this.setShape(0);if(e.code==='KeyC')this.setShape(1)});window.addEventListener('keyup',e=>{if(e.code==='Space')this.releaseShot()});window.addEventListener('blur',()=>{if(this.charging)this.releaseShot()});window.addEventListener('pointerdown',e=>{if(e.target.closest('.game-hud,nav,.modal,button,.account-gate'))return;this.dragging=true;this.dragStart=e.clientX});window.addEventListener('pointermove',e=>{if(this.dragging&&!this.swinging&&!this.charging)this.orbit+=(e.clientX-this.dragStart)*.003;this.dragStart=e.clientX});window.addEventListener('pointerup',()=>this.dragging=false)}
 }
