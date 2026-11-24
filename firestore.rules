@@ -15,7 +15,7 @@ service cloud.firestore {
    allow create: if own(uid) &&
     request.resource.data.keys().hasAll(['username','usernameLower','friends','lastSeen']) &&
     request.resource.data.usernameLower.matches('^[a-z0-9_]{3,20}$') &&
-    get(/databases/$(database)/documents/handles/$(request.resource.data.usernameLower)).data.uid==uid &&
+    getAfter(/databases/$(database)/documents/handles/$(request.resource.data.usernameLower)).data.uid==uid &&
     request.resource.data.friends == [];
    allow update: if own(uid) &&
      request.resource.data.username == resource.data.username &&
