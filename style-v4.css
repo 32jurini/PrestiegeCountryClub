@@ -10,3 +10,16 @@ body:not(.gated) #topbar,body:not(.gated) #bottomNav{pointer-events:auto}
 #golfer .preview { overflow:hidden; }
 #golfer .preview canvas { position:absolute; inset:0; }
 #golfer .preview-title, #golfer .preview-text { position:absolute; z-index:1; }
+
+/* Keep the clubhead and ball visible through contact. */
+.game-hud .game-bottom{display:grid;grid-template-columns:minmax(220px,290px) 1fr auto;gap:8px;bottom:32px;left:18px;right:18px;align-items:end;pointer-events:none}
+.game-bottom .swing-zone{grid-column:1;grid-row:1;padding:9px 12px;border-radius:3px}
+.game-bottom .wind-box{grid-column:3;grid-row:1;padding:8px 12px}
+.game-bottom .aim-panel{grid-column:3;grid-row:2;padding:6px 10px}
+.game-bottom .swing-zone,.game-bottom .aim-panel,.game-bottom .wind-box{pointer-events:auto}
+.game-bottom .aim-panel,.game-bottom .wind-box{flex-direction:row;align-items:center;gap:7px}
+.game-bottom .aim-panel .glass{margin:0;padding:4px}
+.game-bottom .club-select button{min-height:26px;padding:4px}
+.game-bottom .swing-caption{font-size:9px}.game-bottom .swing-title b{font-size:18px}
+.game-bottom .meter{height:7px;margin:5px 0}
+@media(max-width:700px){.game-hud .game-bottom{grid-template-columns:minmax(150px,42vw) 1fr;bottom:10px;left:8px;right:8px}.game-bottom .wind-box,.game-bottom .aim-panel{display:none}.game-bottom .swing-zone{padding:6px}.game-footer{display:none}}

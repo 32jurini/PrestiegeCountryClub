@@ -23,17 +23,6 @@ export function dressGolfer(actor) {
   build(oval,seam);joint.attach(group);
  };
  retain('Head',(oval,seam)=>{
-  oval(0,.094,.012,.105,.134,.105,skin);
-  oval(0,.063,.114,.021,.032,.028,skin);
-  for(const side of [-1,1]){
-   oval(side*.102,.084,.012,.018,.032,.015,skin);
-   oval(side*.040,.105,.104,.022,.010,.009,white);
-   oval(side*.040,.105,.113,.008,.009,.004,eyes);
-   oval(side*.040,.105,.117,.0038,.006,.002,ink);
-   seam([[side*.018,.126,.108],[side*.041,.132,.108],[side*.063,.126,.096]],.0045,hair);
-   oval(side*.089,.116,-.010,.018,.047,.064,hair);
-  }
-  seam([[-.030,.037,.100],[0,.033,.111],[.030,.037,.100]],.0028,mat('#915e51'));
   oval(0,.166,-.019,.109,.074,.107,hair);
   oval(0,.174,.002,.117,.080,.117,suede);
   oval(0,.169,.103,.128,.012,.100,suede);
@@ -56,5 +45,5 @@ export function dressGolfer(actor) {
   oval(0,-.068,.070,.061,.014,.139,white);
   for(let i=0;i<3;i++)seam([[-.032,-.001-i*.004,.045+i*.022],[0,.007-i*.003,.052+i*.022],[.032,-.001-i*.004,.045+i*.022]],.003,white);
  });
- return {skin,hair,eyes,shirt:polo};
+ return {skin,hair,eyes,shirt:polo,pants:mat('#253935'),white,belt:suede,lips:mat('#a67163')};
 }

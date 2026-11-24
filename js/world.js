@@ -1,4 +1,4 @@
-import {plantTrees,horizon,detailSurface} from './course-detail.js';
+import {plantTrees,horizon,detailSurface,frameHole} from './course-detail.js?v=club5';
 import * as THREE from 'three';
 export const COURSES={royal:{name:'THE ROYAL CLASSIC',type:'parkland',sky:0x93bed0,fog:0xb4c5a7,grass:0x507849,rough:0x3e6140,fairway:0x7aa65e,trees:0x254b2b,wind:3,holes:[
  {"name":"Orchard Bend","par":4,"hint":"Favor the left landing area to open the turn.","route":[[0,0,10,0],[55,-13,20,0],[118,-37,16,0],[184,8,9,0]],"green":[11,10],"sand":[[-12,112,9,12],[0,174,5,4]],"water":[]},
@@ -112,7 +112,7 @@ export class World{
  for(let i=0;i<28;i++){const x=(rand(i+123)*2-1)*240,z=-rand(i+421)*350;if(Math.abs(x-this.fairwayX(z))<35)continue;if(name!=='ocean'||x<32)trees.push([x,z,7+rand(i+90)*6,rand(i+37)])}
  this.flag=new THREE.Group();const pole=this.mesh(new THREE.CylinderGeometry(.035,.045,5,8),this.mat(0xf1f1df),this.flag);pole.position.y=2.5;const cloth=this.mesh(new THREE.BufferGeometry(),this.mat(name==='ocean'?0xf4b768:0xd5a861),this.flag);const flagVertices=new Float32Array([0,4.85,0,2,4.38,0,0,4.05,0]);cloth.geometry.setAttribute('position',new THREE.BufferAttribute(flagVertices,3));cloth.geometry.computeVertexNormals();cloth.material.side=THREE.DoubleSide;cloth.castShadow=false;this.flag.position.copy(this.holePosition);this.root.add(this.flag);
  plantTrees(this,trees,name==='summit'?'pine':name==='royal'?'oak':'cypress');
- horizon(this);
+ frameHole(this);horizon(this);
  for(const x of [-2.2,2.2]){
   const marker=this.mesh(new THREE.SphereGeometry(.16,14,8),this.mat(0xeee9d9));
   marker.position.set(x,this.groundHeight(x,70)+.15,70);marker.scale.y=.7;

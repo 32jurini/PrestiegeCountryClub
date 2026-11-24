@@ -50,16 +50,61 @@ export function horizon(world) {
  world.root.add(new THREE.Mesh(g,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide})));
 }
 
+let turf;
 export function detailSurface(material, water=false) {
+ if(!water&&!turf){
+  turf=new THREE.TextureLoader().load(new URL('../assets/course/cut-grass.webp',import.meta.url).href);
+  turf.wrapS=turf.wrapT=THREE.RepeatWrapping;turf.anisotropy=8;
+ }
  material.onBeforeCompile=shader=>{
+  if(!water)shader.uniforms.turfPhoto={value:turf};
   shader.vertexShader='varying vec3 coursePoint;\n'+shader.vertexShader
    .replace('#include <worldpos_vertex>','#include <worldpos_vertex>\ncoursePoint=(modelMatrix*vec4(transformed,1.)).xyz;');
   const shading=water
    ? 'float waves=sin(p.x*2.7+p.y*.9+sin(p.y*.8))*sin(p.y*5.1+sin(p.x*1.4)); diffuseColor.rgb*=.90+.18*waves; diffuseColor.rgb+=vec3(.055,.072,.075)*smoothstep(.52,.92,waves);'
-   : 'float grain=fract(sin(dot(floor(p*64.),vec2(37.7,91.4)))*4375.13)-.5; float blades=1.-smoothstep(.5,3.,length(fwidth(p)*64.)); diffuseColor.rgb*=1.+.16*grain*blades+.045*sin(p.y*.84+p.x*.23);';
-  shader.fragmentShader='varying vec3 coursePoint;\n'+shader.fragmentShader
+   : 'float photo=dot(texture2D(turfPhoto,p*.73).rgb,vec3(.25,.55,.20)); diffuseColor.rgb*=.66+.82*photo;float grain=fract(sin(dot(floor(p*64.),vec2(37.7,91.4)))*4375.13)-.5; float blades=1.-smoothstep(.5,3.,length(fwidth(p)*64.)); diffuseColor.rgb*=1.+.16*grain*blades+.045*sin(p.y*.84+p.x*.23);';
+  shader.fragmentShader=(water?'':'uniform sampler2D turfPhoto;')+'varying vec3 coursePoint;\n'+shader.fragmentShader
    .replace('#include <color_fragment>','#include <color_fragment>\n{ vec2 p=coursePoint.xz; '+shading+' }');
  };
  material.customProgramCacheKey=()=>water?'coastal-water':'cut-turf';
  return material;
+}
+
+export function frameHole(world) {
+ const ocean=world.current==='ocean', summits=world.current==='summit';
+ const geometry=ocean?new THREE.IcosahedronGeometry(1,1):new THREE.PlaneGeometry(1,1,1,3);
+ const material=new THREE.MeshStandardMaterial({color:ocean?0x837e70:0x667547,roughness:.96,side:THREE.DoubleSide});
+ const count=ocean?110:360;
+ const mesh=new THREE.InstancedMesh(geometry,material,count);
+ const pose=new THREE.Object3D(),color=new THREE.Color();
+ const noise=n=>{const v=Math.sin(n*74.49+world.holeIndex*61)*6871.7;return v-Math.floor(v)};
+ for(let i=0;i<count;i++){
+  const t=noise(i+13),z=70-t*world.length;
+  let x,depth=z;
+  if(ocean){
+   const pool=world.water[i%world.water.length],angle=t*2*Math.PI;
+   x=pool.x+Math.cos(angle)*(pool.rx+1.5);depth=pool.z+Math.sin(angle)*(pool.rz+1.5);
+   if(world.lie(x,depth)!=='ROUGH'){x=38+noise(i+6)*3;depth=z}
+   const r=.20+noise(i+85)*.85;pose.scale.set(r*1.9,r*.70,r);
+  }else{
+   const side=i%2===0?-1:1;
+   x=world.fairwayX(z)+side*(world.station(z,2)+(summits?4:1.5)+18*noise(i+41));
+   pose.scale.set(.07+noise(i+64)*.12,.16+noise(i+49)*.28,.1);
+  }
+  pose.position.set(x,world.groundHeight(x,depth)+(ocean?.07:pose.scale.y*.5),depth);
+  pose.rotation.set(ocean?.18:0,noise(i+777)*6.28,(noise(i+32)-.5)*.6);
+  pose.updateMatrix();mesh.setMatrixAt(i,pose.matrix);
+  const tint=.61+.38*noise(i+62);mesh.setColorAt(i,color.setRGB(tint,tint,tint*.93));
+ }
+ mesh.castShadow=ocean;mesh.receiveShadow=true;world.root.add(mesh);
+ // A second stand just outside the dogleg frames the downhill target.
+ if(summits){
+  const stand=[];
+  for(let i=0;i<38;i++){
+   const z=70-(.4+noise(i+21)*.72)*world.length;
+   const x=world.fairwayX(z)+(i%2?-1:1)*(world.station(z,2)+10+noise(i+43)*18);
+   stand.push([x,z,7+noise(i+9)*10,noise(i+77)]);
+  }
+  plantTrees(world,stand,'pine');
+ }
 }
