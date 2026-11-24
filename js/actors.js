@@ -1,4 +1,4 @@
-import {loadFittedModel,fitToRig,tintGolfer} from './tour-golfer.js?v=humanportrait';
+import {loadFittedModel,fitToRig,tintGolfer} from './tour-golfer.js?v=humanfit';
 import {measureShot} from './shot-pose.js?v=approach2';
 import * as THREE from 'three';
 import {FBXLoader} from 'three/addons/loaders/FBXLoader.js';
