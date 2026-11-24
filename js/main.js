@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {GolfGame} from './game.js?v=lift';
 import {SoundEngine} from './sound.js';
+import {OnlineRoom} from './online.js?v=online1';
 const $=id=>document.getElementById(id);
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(window.devicePixelRatio,1.6));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;$('viewport').appendChild(renderer.domElement);
 const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(54,innerWidth/innerHeight,.1,1100);const sun=new THREE.DirectionalLight(0xffe7c7,2.1);sun.position.set(-65,100,42);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-14;sun.shadow.camera.right=14;sun.shadow.camera.top=14;sun.shadow.camera.bottom=-14;sun.shadow.camera.near=.5;sun.shadow.camera.far=320;sun.shadow.normalBias=.009;sun.shadow.bias=-.00012;scene.add(sun.target);scene.add(sun);scene.add(new THREE.HemisphereLight(0xc3e8ff,0x55513e,1.25));
@@ -14,7 +15,7 @@ function sizeCanvas() {
  renderer.setSize(box.width, box.height);
 }
 new ResizeObserver(sizeCanvas).observe(preview);
-const showPage=id=>{page=id;document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===id));document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('selected',b.dataset.page===id));document.body.classList.toggle('is-playing',id==='playing');(id==='golfer'?preview:$('viewport')).appendChild(renderer.domElement);sizeCanvas();if(id!=='playing'){game.enterMenu();if(id==='golfer')game.enterPreview()}};
+const showPage=id=>{if(id!=='playing'&&page==='playing'&&onlineActive)endOnline();page=id;document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===id));document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('selected',b.dataset.page===id));document.body.classList.toggle('is-playing',id==='playing');(id==='golfer'?preview:$('viewport')).appendChild(renderer.domElement);sizeCanvas();if(id!=='playing'){game.enterMenu();if(id==='golfer')game.enterPreview()}};
 const showError=msg=>{$('accountFeedback').textContent=msg;$('accountFeedback').classList.remove('hidden')};
 const hex=bytes=>Array.from(new Uint8Array(bytes)).map(b=>b.toString(16).padStart(2,'0')).join('');
 async function hashPassword(password){if(!globalThis.crypto?.subtle)throw new Error('Secure sign-in requires HTTPS. Open the published GitHub Pages website.');const bytes=new TextEncoder().encode(password);return hex(await crypto.subtle.digest('SHA-256',bytes))}
@@ -60,8 +61,37 @@ async function equip(){const frame=$('golferFrame').value;$('animationStatus').t
 $('saveGolfer').onclick=async()=>{const golfer={name:$('golferName').value.trim()||'ROOKIE',frame:$('golferFrame').value,...palette()};localStorage.setItem('prestiege-golfer',JSON.stringify(golfer));$('loader').classList.remove('hidden');try{await equip();$('loader').classList.add('hidden');showPage('home')}catch(e){$('loader').classList.add('hidden');$('error').textContent='Golfer could not load: '+e.message;$('error').classList.remove('hidden')}};
 ['shirtColor','pantsColor','hairColor','eyeColor','skinColor'].forEach(id=>$(id).addEventListener('input',()=>game.golfer.applyAppearance(palette())));$('golferFrame').addEventListener('change',async()=>{$('golferFrame').disabled=true;$('loader').classList.remove('hidden');try{await equip()}catch(e){$('error').textContent='Golfer preview could not load: '+e.message;$('error').classList.remove('hidden')}finally{$('golferFrame').disabled=false;$('loader').classList.add('hidden')}});
 $('soundBtn').onclick=async()=>{const on=await sound.toggle();$('soundBtn').textContent=on?'SOUND ON':'SOUND OFF'};
+
+const onlinePanel=$('onlinePanel'),onlineStatus=$('onlineStatus'),onlineCode=$('onlineCode'),rivalStats=$('rivalStats');
+const ghost=new THREE.Mesh(new THREE.SphereGeometry(.075,16,12),new THREE.MeshStandardMaterial({color:0xffca69,emissive:0x3c2500,emissiveIntensity:.2}));
+ghost.castShadow=true;ghost.visible=false;scene.add(ghost);
+let onlineActive=false,remoteState=null,lastSent=0;let remoteTarget=new THREE.Vector3();
+const room=new OnlineRoom({
+ onStatus:message=>{onlineStatus.textContent=message;onlineCode.textContent=room.role==='host'&&room.room?'ROOM CODE: '+room.room:'';},
+ onStart:async(course,opponent)=>{
+  onlineActive=true;remoteState=null;ghost.visible=false;onlinePanel.classList.add('hidden');
+  $('rivalName').textContent=opponent.toUpperCase();rivalStats.hidden=false;
+  await start(course,false);
+ },
+ onState:state=>{
+  if(!onlineActive||!Array.isArray(state.position)||state.position.length!==3||state.position.some(n=>!Number.isFinite(n)||Math.abs(n)>1e5))return;
+  remoteState=state;
+  const sameHole=game.started&&game.index===state.hole;
+  ghost.visible=sameHole;if(sameHole){remoteTarget.set(...state.position);if(!ghost.userData.initialized){ghost.position.copy(remoteTarget);ghost.userData.initialized=true}}
+  else ghost.userData.initialized=false;
+  const total=(Array.isArray(state.scores)?state.scores:[]).reduce((a,b)=>a+(Number(b)||0),0);
+  $('rivalScore').textContent='HOLE '+(Number(state.hole)+1)+' · '+Number(state.strokes)+' SHOTS · '+total+' FINISHED';
+ },
+ onDisconnect:()=>{ghost.visible=false;if(onlineActive){$('rivalScore').textContent='FRIEND DISCONNECTED';onlineActive=false}}
+});
+function endOnline(){onlineActive=false;remoteState=null;ghost.visible=false;ghost.userData.initialized=false;rivalStats.hidden=true;room.close()}
+$('onlineOpen').onclick=()=>{showPage('home');onlinePanel.classList.remove('hidden');onlineStatus.textContent='Host a private match or enter a friend’s code';onlineCode.textContent=''};
+$('onlineClose').onclick=()=>onlinePanel.classList.add('hidden');
+$('onlineHost').onclick=()=>room.host($('onlineCourse').value,($('golferName').value.trim()||'Golfer').slice(0,22));
+$('onlineJoin').onclick=()=>room.join($('onlineJoinCode').value,($('golferName').value.trim()||'Golfer').slice(0,22));
+$('onlineCopy').onclick=()=>{if(room.room){navigator.clipboard?.writeText(room.room);onlineStatus.textContent='Room code copied — send it to your friend'}};
 const sunOffset=new THREE.Vector3(-39,53,27);
-function loop(){requestAnimationFrame(loop);const dt=Math.min(game.clock.getDelta(),.05);game.update(dt);const dusk=game.world.current==='misty';
+function loop(){requestAnimationFrame(loop);const dt=Math.min(game.clock.getDelta(),.05);game.update(dt);if(onlineActive&&room.connected&&game.started&&performance.now()-lastSent>110){lastSent=performance.now();room.send(room.snapshot(game))}if(ghost.visible)ghost.position.lerp(remoteTarget,Math.min(1,dt*13));const dusk=game.world.current==='misty';
  if(sun.userData.dusk!==dusk){
   sun.userData.dusk=dusk;sunOffset.set(...(dusk?[-24,12,-64]:[-39,53,27]));
   sun.color.setHex(dusk?0xffbb85:0xffe7c7);sun.intensity=dusk?1.75:2.1;
