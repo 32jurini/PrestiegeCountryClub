@@ -23,3 +23,16 @@ body:not(.gated) #topbar,body:not(.gated) #bottomNav{pointer-events:auto}
 .game-bottom .swing-caption{font-size:9px}.game-bottom .swing-title b{font-size:18px}
 .game-bottom .meter{height:7px;margin:5px 0}
 @media(max-width:700px){.game-hud .game-bottom{grid-template-columns:minmax(150px,42vw) 1fr;bottom:10px;left:8px;right:8px}.game-bottom .wind-box,.game-bottom .aim-panel{display:none}.game-bottom .swing-zone{padding:6px}.game-footer{display:none}}
+
+/* Iron Bag — seven lofts with shot shaping */
+.game-bottom .swing-zone{width:min(430px,calc(100vw - 36px));max-width:none}
+.iron-bag{margin-top:8px;padding-top:8px;border-top:1px solid rgba(229,211,167,.32);pointer-events:auto}
+.iron-bag-title{font:600 11px Oswald;letter-spacing:1.6px;color:#d9c38f;display:flex;justify-content:space-between;gap:8px}
+.iron-bag-title span{font:500 9px 'DM Sans',sans-serif;letter-spacing:.5px;color:#b6c2bd}
+.iron-options,.iron-shape{display:flex;gap:4px;margin-top:7px}
+.iron-options button,.iron-shape button{flex:1;min-width:0;background:#132f27;border:1px solid #416155;color:#d0ddcf;padding:7px 2px;font:600 12px Oswald;cursor:pointer;pointer-events:auto}
+.iron-shape button{font:600 10px 'DM Sans',sans-serif;padding:6px 2px}
+.iron-options button:hover,.iron-shape button:hover,.iron-options button.active,.iron-shape button.active{background:#e2cc97;border-color:#e2cc97;color:#10251c}
+.iron-details{font:500 9px 'DM Sans',sans-serif;letter-spacing:.5px;color:#e1e1d2;margin-top:7px;min-height:12px}
+.iron-bag.iron-selected{border-top-color:#e2cc97}
+@media(max-width:700px){.game-bottom .swing-zone{width:min(400px,calc(100vw - 16px))}.iron-options button{padding:6px 1px;font-size:11px}.iron-shape button{font-size:9px}.iron-bag-title span{display:none}}

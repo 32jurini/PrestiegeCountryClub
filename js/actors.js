@@ -39,14 +39,14 @@ export class Golfer{
   shaft.position.y=-.5;
   const grip=new THREE.Mesh(new THREE.CylinderGeometry(.019,.015,.24,16),new THREE.MeshStandardMaterial({color:0x25322f}));
   grip.position.y=-.10;
-  this.clubHead=new THREE.Mesh(new THREE.SphereGeometry(1,18,12),metal.clone());
+  this.clubHead=new THREE.Mesh(new THREE.SphereGeometry(1,18,12),metal.clone());this.driverGeometry=this.clubHead.geometry;const blade=new THREE.Shape();blade.moveTo(-.90,-.33);blade.lineTo(.73,-.37);blade.quadraticCurveTo(1.03,-.28,.94,.20);blade.quadraticCurveTo(.80,.44,.44,.42);blade.lineTo(-.72,.22);blade.quadraticCurveTo(-.97,.08,-.90,-.33);this.ironGeometry=new THREE.ExtrudeGeometry(blade,{depth:.16,bevelEnabled:true,bevelSegments:2,steps:1,bevelSize:.035,bevelThickness:.025});this.ironGeometry.computeVertexNormals();
   this.clubHead.scale.set(.09,.045,.07);
   this.clubHead.position.y=-1;
   this.club.add(shaft,grip,this.clubHead);
   this.root.add(this.club);
  }
  setClub(type) {
-  this.clubHead.scale.set(type==='driver'?.095:.078,type==='putter'?.022:.044,type==='driver'?.075:.035);
+  const iron=/^iron[3-9]$/.test(type);this.clubHead.geometry=iron?this.ironGeometry:this.driverGeometry;this.clubHead.rotation.set(0,0,0);if(iron){this.clubHead.scale.set(.12,.15,.25);this.clubHead.rotation.z=(Number(type.slice(-1))-3)*.045;this.clubHead.material.color.set(0xc9d5d8);this.clubHead.material.metalness=.91;this.clubHead.material.roughness=.17;}else{this.clubHead.scale.set(type==='driver'?.095:.078,type==='putter'?.022:.044,type==='driver'?.075:.035);this.clubHead.material.color.set(type==='putter'?0x697b83:0xb6c6c8);this.clubHead.material.metalness=.7;this.clubHead.material.roughness=.28;}
  }
  groundShoes() {
   if(!this.soles||!this.stanceGround)return;
