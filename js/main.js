@@ -21,10 +21,9 @@ const showError=msg=>{$('accountFeedback').textContent=msg;$('accountFeedback').
 const hex=bytes=>Array.from(new Uint8Array(bytes)).map(b=>b.toString(16).padStart(2,'0')).join('');
 async function hashPassword(password){if(!globalThis.crypto?.subtle)throw new Error('Secure sign-in requires HTTPS. Open the published GitHub Pages website.');const bytes=new TextEncoder().encode(password);return hex(await crypto.subtle.digest('SHA-256',bytes))}
 function readAccount(){try{return JSON.parse(localStorage.getItem('prestiege-account')||'null')}catch{return null}}
-function accountUI(mode){accountMode=mode;$('accountModeTitle').textContent=mode==='create'?'CREATE YOUR CLUB ACCOUNT':'WELCOME BACK';$('accountSubmit').textContent=mode==='create'?'CREATE ACCOUNT':'SIGN IN';$('accountNameWrap').classList.toggle('hidden',mode!=='create');$('accountName').required=mode==='create';$('accountModeToggle').textContent=mode==='create'?'Already a member? Sign in':'New to the club? Create account';$('accountFeedback').classList.add('hidden')}
 function enterClub(user){activeUser=user;$('accountGate').classList.add('hidden');document.body.classList.remove('gated');$('accountBtn').textContent=user.username.toUpperCase();const saved=(()=>{try{return JSON.parse(localStorage.getItem('prestiege-golfer'))||null}catch{return null}})();if(!saved){showPage('golfer');game.enterPreview()}else showPage('home')}
 window.addEventListener('pcc-account-ready',event=>enterClub(event.detail));
-$('accountModeToggle').onclick=()=>accountUI(accountMode==='create'?'signin':'create');$('accountBtn').onclick=()=>{$('accountGate').classList.remove('hidden');document.body.classList.add('gated');accountUI(readAccount()?'signin':'create')};
+$('accountBtn').onclick=()=>{$('accountGate').classList.remove('hidden');document.body.classList.add('gated');window.dispatchEvent(new CustomEvent('pcc-account-mode',{detail:readAccount()?'signin':'create'}))};
 const lessons=[
  ['WELCOME TO PRESTIEGE','I’m Coach Timmy. Welcome to the club! I’ll show you how to set up, aim, swing and putt.','talk'],
  ['SET UP YOUR BALL','First, place your tee and ball. Watch me demonstrate the setup.','tee'],
