@@ -32,6 +32,7 @@ export function dressGolfer(actor) {
   oval(0,.207,.104,.017,.020,.004,white);
   seam([[-.006,.201,.109],[-.006,.216,.109],[.007,.212,.109]],.0025,suede);
  });
+ retain('Neck',(oval)=>{oval(0,-.012,0,.066,.034,.063,polo)});
  retain('Spine2',(oval,seam)=>{
   for(const side of [-1,1]){
    const collar=oval(side*.049,.095,.065,.067,.014,.043,polo);

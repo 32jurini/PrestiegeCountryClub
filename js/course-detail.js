@@ -72,9 +72,17 @@ export function detailSurface(material, water=false) {
 
 export function frameHole(world) {
  const ocean=world.current==='ocean', summits=world.current==='summit';
- const geometry=ocean?new THREE.IcosahedronGeometry(1,1):new THREE.PlaneGeometry(1,1,1,3);
+ const geometry=ocean?new THREE.IcosahedronGeometry(1,1):new THREE.BufferGeometry();
+ if(!ocean){
+  const tips=[];
+  for(let j=0;j<7;j++){
+   const a=j*2.4,x=.26*Math.cos(a),z=.26*Math.sin(a);
+   tips.push(x-.033,0,z,x+.033,0,z,x*1.55,.55+.4*Math.abs(Math.sin(a+1)),z*1.55);
+  }
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute(tips,3));geometry.computeVertexNormals();
+ }
  const material=new THREE.MeshStandardMaterial({color:ocean?0x837e70:0x667547,roughness:.96,side:THREE.DoubleSide});
- const count=ocean?110:360;
+ const count=ocean?110:2000;
  const mesh=new THREE.InstancedMesh(geometry,material,count);
  const pose=new THREE.Object3D(),color=new THREE.Color();
  const noise=n=>{const v=Math.sin(n*74.49+world.holeIndex*61)*6871.7;return v-Math.floor(v)};
@@ -89,9 +97,9 @@ export function frameHole(world) {
   }else{
    const side=i%2===0?-1:1;
    x=world.fairwayX(z)+side*(world.station(z,2)+(summits?4:1.5)+18*noise(i+41));
-   pose.scale.set(.07+noise(i+64)*.12,.16+noise(i+49)*.28,.1);
+   pose.scale.set(.22,.06+noise(i+49)*.10,.22);
   }
-  pose.position.set(x,world.groundHeight(x,depth)+(ocean?.07:pose.scale.y*.5),depth);
+  pose.position.set(x,world.groundHeight(x,depth)+(ocean?.07:0),depth);
   pose.rotation.set(ocean?.18:0,noise(i+777)*6.28,(noise(i+32)-.5)*.6);
   pose.updateMatrix();mesh.setMatrixAt(i,pose.matrix);
   const tint=.61+.38*noise(i+62);mesh.setColorAt(i,color.setRGB(tint,tint,tint*.93));
@@ -107,4 +115,18 @@ export function frameHole(world) {
   }
   plantTrees(world,stand,'pine');
  }
+}
+
+// Cut the turf out of the bunker footprint even where neighboring terrain triangles span the lip.
+export function cutBunkers(material,holes) {
+ const previous=material.onBeforeCompile.bind(material);
+ const key=material.customProgramCacheKey();
+ material.onBeforeCompile=shader=>{
+  previous(shader);
+  shader.uniforms.sandAreas={value:holes.map(([x,d,rx,rz])=>new THREE.Vector4(x,70-d,rx,rz))};
+  shader.vertexShader='varying vec2 sandXZ;\n'+shader.vertexShader.replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nsandXZ=(modelMatrix*vec4(transformed,1.)).xz;');
+  shader.fragmentShader='varying vec2 sandXZ;uniform vec4 sandAreas['+holes.length+'];\n'+shader.fragmentShader.replace('#include <alphatest_fragment>',`#include <alphatest_fragment>
+   for(int i=0;i<${holes.length};i++){vec4 area=sandAreas[i];vec2 q=(sandXZ-area.xy)/area.zw;float a=atan(q.y,q.x);if(length(q)<.996*(1.+.14*sin(3.*a+.5)+.08*cos(5.*a)))discard;}`);
+ };
+ material.customProgramCacheKey=()=>key+'-sand-'+holes.length;
 }

@@ -1,6 +1,6 @@
-import {dressGolfer} from './outfit.js?v=club5b';
-import {loadFittedModel,fitToRig} from './tour-golfer.js?v=club5b';
-import {measureShot} from './shot-pose.js';
+import {dressGolfer} from './outfit.js?v=approach2';
+import {loadFittedModel,fitToRig} from './tour-golfer.js?v=approach2';
+import {measureShot} from './shot-pose.js?v=approach2';
 import * as THREE from 'three';
 import {FBXLoader} from 'three/addons/loaders/FBXLoader.js';
 import JSZip from 'jszip';

@@ -23,7 +23,7 @@ export function measureShot(actor, name, THREE) {
   } else {
     const grip = sample(t, hand);
     // The grip points away from the player's chest and down to ball height.
-    const contact = grip.clone().add(new THREE.Vector3(-.54, .10-grip.y, 0));
+    const contact = grip.clone().add(new THREE.Vector3(-.54, .029-grip.y, 0));
     const target = hand.worldToLocal(root.localToWorld(contact.clone()));
     actor.club.rotation.set(0,0,0);
     actor.club.scale.setScalar(target.length());
