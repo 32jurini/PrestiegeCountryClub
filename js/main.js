@@ -44,11 +44,13 @@ $('bagContents').addEventListener('click',event=>{
  const button=event.target.closest('[data-pick]');
  if(button)game.returnFromBag(button.dataset.pick);
 });
-renderer.domElement.addEventListener('pointermove',event=>{
+$('playing').addEventListener('pointermove',event=>{
+ if(event.target.closest('button'))return;
  if(game.bagPhase==='select')game.highlightBagClub(game.clubUnderPointer(event));
 });
-renderer.domElement.addEventListener('pointerleave',()=>game.highlightBagClub(null));
-renderer.domElement.addEventListener('click',event=>{
+$('playing').addEventListener('pointerleave',()=>game.highlightBagClub(null));
+$('playing').addEventListener('click',event=>{
+ if(event.target.closest('button'))return;
  const club=game.clubUnderPointer(event);if(club)game.returnFromBag(club);
 });
 document.querySelectorAll('[data-shape]').forEach(b=>b.onclick=()=>game.setShape(b.dataset.shape));
