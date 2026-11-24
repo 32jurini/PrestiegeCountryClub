@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {GolfGame} from './game.js?v=canopy';
+import {GolfGame} from './game.js?v=bagwalk';
 import {SoundEngine} from './sound.js';
 const $=id=>document.getElementById(id);
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(window.devicePixelRatio,1.6));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;$('viewport').appendChild(renderer.domElement);
@@ -26,7 +26,7 @@ $('accountModeToggle').onclick=()=>accountUI(accountMode==='create'?'signin':'cr
 const lessons=[
  ['WELCOME TO PRESTIEGE','I’m Coach Timmy. Welcome to the club! I’ll show you how to set up, aim, swing and putt.','talk'],
  ['SET UP YOUR BALL','First, place your tee and ball. Watch me demonstrate the setup.','tee'],
- ['CHOOSE YOUR CLUB','The driver is for long tee shots. Irons cover approach shots, wedges are for short shots, and the putter is for the green.','pointGesture'],
+ ['CHOOSE YOUR CLUB','Press C to walk to your bag. Click a labeled club to take it back to the ball. The driver is for long tee shots. Irons cover approach shots, wedges are for short shots, and the putter is for the green.','pointGesture'],
  ['AIM YOUR SHOT','Use A / D or the arrow keys to aim. Keep the blue tracer on your target and check the wind before you swing.','point'],
  ['WATCH A FULL SWING','Hold SPACE to build power, then release near the highlighted timing zone. Watch the golfer complete the full swing before the camera follows the ball.','drive'],
  ['CHIPPING & PUTTING','Use your wedge around the green and the putter once you reach the putting surface. I’ll demonstrate both.','chip'],
@@ -38,7 +38,14 @@ const openTutorial=()=>{lessonIndex=0;$('tutorialOverlay').classList.remove('hid
 $('coachNext').onclick=()=>{if(++lessonIndex>=lessons.length)closeTutorial();else renderLesson()};$('coachSkip').onclick=closeTutorial;
 const start=async(name='royal',tutorial=false)=>{showPage('playing');$('loader').classList.remove('hidden');try{await game.begin(name,tutorial);$('loader').classList.add('hidden');if(tutorial)openTutorial()}catch(e){$('loader').classList.add('hidden');$('error').textContent='Could not start round: '+e.message;$('error').classList.remove('hidden')}};
 document.querySelectorAll('[data-page]').forEach(b=>b.addEventListener('click',()=>showPage(b.dataset.page)));
-$('heroPlay').onclick=()=>{if(!localStorage.getItem('prestiege-v4-tutorial-done'))start('royal',true);else showPage('courses')};document.querySelectorAll('[data-course]').forEach(b=>b.addEventListener('click',()=>start(b.dataset.course,!localStorage.getItem('prestiege-v4-tutorial-done'))));$('rangeTab').onclick=()=>start('range',false);$('exitRound').onclick=()=>showPage('courses');$('toClubhouse').onclick=()=>showPage('courses');$('nextHole').onclick=()=>game.actionNext();$('resetAim').onclick=()=>{game.aimDelta(-game.aim)};document.querySelectorAll('[data-club]').forEach(b=>b.addEventListener('click',()=>game.chooseClub(b.dataset.club)));document.querySelectorAll('[data-option]').forEach(b=>b.addEventListener('click',()=>game.chooseClub(b.dataset.option)));document.querySelectorAll('[data-iron]').forEach(b=>b.addEventListener('click',()=>game.chooseClub(b.dataset.iron)));document.querySelectorAll('[data-shape]').forEach(b=>b.addEventListener('click',()=>game.setShape(b.dataset.shape)));document.getElementById('ironBag')?.addEventListener('wheel',event=>{if(Math.abs(event.deltaY)<1)return;event.preventDefault();game.cycleIron(event.deltaY>0?1:-1)},{passive:false});
+$('heroPlay').onclick=()=>{if(!localStorage.getItem('prestiege-v4-tutorial-done'))start('royal',true);else showPage('courses')};document.querySelectorAll('[data-course]').forEach(b=>b.addEventListener('click',()=>start(b.dataset.course,!localStorage.getItem('prestiege-v4-tutorial-done'))));$('rangeTab').onclick=()=>start('range',false);$('exitRound').onclick=()=>showPage('courses');$('toClubhouse').onclick=()=>showPage('courses');$('nextHole').onclick=()=>game.actionNext();$('resetAim').onclick=()=>{game.aimDelta(-game.aim)};$('openBag').onclick=()=>game.openBag();
+$('closeBag').onclick=()=>game.returnFromBag(game.club);
+$('bagContents').addEventListener('click',event=>{
+ const button=event.target.closest('[data-pick]');
+ if(button)game.returnFromBag(button.dataset.pick);
+});
+renderer.domElement.addEventListener('click',event=>game.pickBagHead(event));
+document.querySelectorAll('[data-shape]').forEach(b=>b.onclick=()=>game.setShape(b.dataset.shape));
 const saved=(()=>{try{return JSON.parse(localStorage.getItem('prestiege-golfer'))||{}}catch{return {}}})();$('golferName').value=saved.name||'ROOKIE';$('golferFrame').value=saved.frame||'male';$('shirtColor').value=saved.shirt||'#e9f0e9';$('hairColor').value=saved.hair||'#36261f';$('eyeColor').value=saved.eyes||'#4c8069';$('skinColor').value=saved.skin||'#ba8c70';$('pantsColor').value=saved.pants||'#1d3535';
 const palette=()=>({shirt:$('shirtColor').value,pants:$('pantsColor').value,hair:$('hairColor').value,eyes:$('eyeColor').value,skin:$('skinColor').value});
 async function equip(){const frame=$('golferFrame').value;$('animationStatus').textContent='LOADING GOLF ANIMATIONS…';const source=await game.prepareGolfer(frame);game.golfer.applyAppearance(palette());$('modelSource').textContent=source.toUpperCase();const ready=['idle','drive','chip','putt','walk','run','tee','pick'].filter(name=>game.golfer.actions.has(name)).length;$('animationStatus').textContent=ready===8?`8/8 GOLF ANIMATIONS READY · ${game.golfer.actions.size}/19 CLIPS LOADED`:`${ready}/8 GOLF ANIMATIONS · BUILT-IN SWING BACKUP`;return source}

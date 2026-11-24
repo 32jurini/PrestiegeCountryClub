@@ -72,7 +72,7 @@ export class Golfer{
   this.clubHead.rotation.set(blade?-(iron?.23+.045*(Number(type.slice(-1))-3):.71):0,0,0);
   if(blade)this.clubHead.scale.setScalar(1);
   else if(type==='putter')this.clubHead.scale.set(.065,.018,.028);
-  else this.clubHead.scale.setScalar(type==='wood'?.77:1).multiply(new THREE.Vector3(.095,.044,.075));
+  else this.clubHead.scale.setScalar(type==='hybrid'?.64:type==='wood'?.77:1).multiply(new THREE.Vector3(.095,.044,.075));
   this.clubHead.material.color.set(blade?0xc8d2d6:type==='putter'?0x697b83:0x687781);
   this.clubHead.material.metalness=blade?.72:.58;this.clubHead.material.roughness=blade?.29:.31;
  }

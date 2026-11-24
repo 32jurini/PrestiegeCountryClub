@@ -46,3 +46,16 @@ body:not(.gated) #topbar,body:not(.gated) #bottomNav{pointer-events:auto}
 #scorecard table{width:100%;border-collapse:collapse;letter-spacing:0;font-variant-numeric:tabular-nums;margin:.6rem 0}#scorecard caption{text-align:left;color:#f2ebd9}#scorecard th,#scorecard td{padding:.15rem;border-bottom:1px solid #496055;text-align:center}#scorecard th:first-child{text-align:left}#roundModal>div{max-height:94dvh;overflow-y:auto;box-sizing:border-box}@media(max-width:540px){#roundModal>div{padding:20px}}
 
 [data-bag][hidden]{display:none}
+
+#openBag{margin-top:8px;pointer-events:auto}
+.iron-shape[hidden],#bagPanel[hidden]{display:none}
+.at-bag .game-bottom,.at-bag .shot-indicator,.at-bag .game-footer{visibility:hidden}
+#bagPanel{position:absolute;z-index:9;right:2vw;top:50%;transform:translateY(-50%);width:min(300px,36vw);max-height:74vh;overflow:auto;padding:16px;background:#10271ff5;color:#f1efdf;border:1px solid #677a65}
+#bagPanel header{display:flex;align-items:center;justify-content:space-between}
+#bagPanel h2,#bagPanel h3{margin:0;font-family:Oswald,sans-serif}
+#bagPanel h2{font-size:22px;text-transform:uppercase}
+#bagPanel h3{font-size:13px;color:#ddc995;margin:8px 0 4px}
+#bagContents section div{display:flex;flex-wrap:wrap;gap:4px}
+#bagPanel button{background:#264239;border:1px solid #52695c;color:#f1efdf;padding:4px 8px;cursor:pointer;font:600 12px Oswald,sans-serif}
+#bagPanel button:hover,#bagPanel button[aria-pressed=true]{background:#dbc998;color:#14271c}
+@media(max-width:650px){#bagPanel{width:48vw;max-height:62vh;right:1vw;padding:9px}}
