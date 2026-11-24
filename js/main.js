@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import {GolfGame} from './game.js?v=lift';
 import {SoundEngine} from './sound.js';
-import {OnlineRoom} from './online.js?v=online1';
+import {OnlineRoom} from './online.js?v=friends1';
+import {FriendsService,isOnline} from './friends.js?v=friends1';
 const $=id=>document.getElementById(id);
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(window.devicePixelRatio,1.6));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;$('viewport').appendChild(renderer.domElement);
 const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(54,innerWidth/innerHeight,.1,1100);const sun=new THREE.DirectionalLight(0xffe7c7,2.1);sun.position.set(-65,100,42);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-14;sun.shadow.camera.right=14;sun.shadow.camera.top=14;sun.shadow.camera.bottom=-14;sun.shadow.camera.near=.5;sun.shadow.camera.far=320;sun.shadow.normalBias=.009;sun.shadow.bias=-.00012;scene.add(sun.target);scene.add(sun);scene.add(new THREE.HemisphereLight(0xc3e8ff,0x55513e,1.25));
@@ -66,7 +67,9 @@ const onlinePanel=$('onlinePanel'),onlineStatus=$('onlineStatus'),onlineCode=$('
 const ghost=new THREE.Mesh(new THREE.SphereGeometry(.075,16,12),new THREE.MeshStandardMaterial({color:0xffca69,emissive:0x3c2500,emissiveIntensity:.2}));
 ghost.castShadow=true;ghost.visible=false;scene.add(ghost);
 let onlineActive=false,remoteState=null,lastSent=0;let remoteTarget=new THREE.Vector3();
+let friendsReady=false;const friends=new FriendsService(()=>renderFriends());
 const room=new OnlineRoom({
+ onHosted:(code,course)=>friends.host(code,course).then(()=>{onlineStatus.textContent='Hosting '+course.toUpperCase()+' — friends can now join you'}).catch(err=>onlineStatus.textContent=err.message),
  onStatus:message=>{onlineStatus.textContent=message;onlineCode.textContent=room.role==='host'&&room.room?'ROOM CODE: '+room.room:'';},
  onStart:async(course,opponent)=>{
   onlineActive=true;remoteState=null;ghost.visible=false;onlinePanel.classList.add('hidden');
@@ -84,11 +87,49 @@ const room=new OnlineRoom({
  },
  onDisconnect:()=>{ghost.visible=false;if(onlineActive){$('rivalScore').textContent='FRIEND DISCONNECTED';onlineActive=false}}
 });
-function endOnline(){onlineActive=false;remoteState=null;ghost.visible=false;ghost.userData.initialized=false;rivalStats.hidden=true;room.close()}
-$('onlineOpen').onclick=()=>{showPage('home');onlinePanel.classList.remove('hidden');onlineStatus.textContent='Host a private match or enter a friend’s code';onlineCode.textContent=''};
+function endOnline(){onlineActive=false;remoteState=null;ghost.visible=false;ghost.userData.initialized=false;rivalStats.hidden=true;room.close();friends.unhost().catch(()=>{})}
+function renderFriends(){
+ const login=$('friendsLogin'),content=$('friendsContent'),status=$('friendsStatus'),list=$('friendsList'),inbox=$('friendsInbox');
+ if(!friendsReady){login.hidden=false;content.hidden=true;return}
+ if(!friends.profile?.username){login.hidden=false;content.hidden=true;status.textContent='Choose a unique online username for this browser.';return}
+ login.hidden=true;content.hidden=false;$('friendsMe').textContent='SIGNED IN AS @'+friends.profile.username;
+ inbox.replaceChildren();
+ for(const request of friends.requests){
+  const item=document.createElement('div');item.className='friend-row';
+  const label=document.createElement('span');label.textContent='@'+request.fromName+' sent a friend request';
+  const yes=document.createElement('button');yes.textContent='ACCEPT';yes.onclick=()=>friends.accept(request.id).catch(showFriendsError);
+  const no=document.createElement('button');no.textContent='DECLINE';no.onclick=()=>friends.reject(request.id).catch(showFriendsError);
+  item.append(label,yes,no);inbox.append(item);
+ }
+ if(!friends.requests.length)inbox.textContent='No pending requests';
+ list.replaceChildren();
+ for(const friend of friends.friends){
+  const item=document.createElement('div');item.className='friend-row';
+  const name=document.createElement('span');name.textContent='@'+friend.username+' · '+(isOnline(friend)?friend.hosting?'HOSTING '+friend.course?.toUpperCase():'ONLINE':'OFFLINE');
+  item.append(name);
+  if(friend.hosting&&isOnline(friend)){
+   const join=document.createElement('button');join.textContent='JOIN GAME';
+   join.onclick=()=>room.join(friend.hosting,friends.profile.username);
+   item.append(join);
+  }
+  list.append(item);
+ }
+ if(!friends.friends.length)list.textContent='Your friends will appear here';
+}
+function showFriendsError(error){onlineStatus.textContent=error.message||String(error)}
+async function openFriends(){
+ onlinePanel.classList.remove('hidden');
+ try{
+  if(!friendsReady){onlineStatus.textContent='Connecting to online friends…';await friends.init();friendsReady=true}
+  renderFriends();onlineStatus.textContent=friends.profile?.username?'Search for a username or host a round':'Choose your online username';
+ }catch(error){onlineStatus.textContent=error.message;friendsReady=false}
+}
+$('friendsRegister').onclick=async()=>{try{await friends.register($('friendsUsername').value);renderFriends();onlineStatus.textContent='Username registered — add your first friend!'}catch(error){showFriendsError(error)}};
+$('friendsAdd').onclick=async()=>{try{const name=await friends.sendRequest($('friendsSearch').value);onlineStatus.textContent='Friend request sent to @'+name}catch(error){showFriendsError(error)}};
+$('onlineOpen').onclick=()=>{showPage('home');openFriends()};
 $('onlineClose').onclick=()=>onlinePanel.classList.add('hidden');
-$('onlineHost').onclick=()=>room.host($('onlineCourse').value,($('golferName').value.trim()||'Golfer').slice(0,22));
-$('onlineJoin').onclick=()=>room.join($('onlineJoinCode').value,($('golferName').value.trim()||'Golfer').slice(0,22));
+$('onlineHost').onclick=()=>{if(!friends.profile?.username){onlineStatus.textContent='Register your online username first';return}room.host($('onlineCourse').value,friends.profile.username)};
+$('onlineJoin').onclick=()=>{if(!friends.profile?.username){onlineStatus.textContent='Register your online username first';return}room.join($('onlineJoinCode').value,friends.profile.username)};
 $('onlineCopy').onclick=()=>{if(room.room){navigator.clipboard?.writeText(room.room);onlineStatus.textContent='Room code copied — send it to your friend'}};
 const sunOffset=new THREE.Vector3(-39,53,27);
 function loop(){requestAnimationFrame(loop);const dt=Math.min(game.clock.getDelta(),.05);game.update(dt);if(onlineActive&&room.connected&&game.started&&performance.now()-lastSent>110){lastSent=performance.now();room.send(room.snapshot(game))}if(ghost.visible)ghost.position.lerp(remoteTarget,Math.min(1,dt*13));const dusk=game.world.current==='misty';

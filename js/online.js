@@ -1,8 +1,8 @@
 // Peer-to-peer, private two-player rooms. PeerJS Cloud provides signaling only.
 // No account verification, server-side scoring, persistent matchmaking or reconnection yet.
 export class OnlineRoom {
- constructor({onStatus,onStart,onState,onDisconnect}) {
-  this.onStatus=onStatus;this.onStart=onStart;this.onState=onState;this.onDisconnect=onDisconnect;
+ constructor({onStatus,onStart,onState,onDisconnect,onHosted}) {
+  this.onStatus=onStatus;this.onStart=onStart;this.onState=onState;this.onDisconnect=onDisconnect;this.onHosted=onHosted;
   this.peer=null;this.connection=null;this.role='';this.room='';this.connected=false;
  }
  status(value){this.onStatus?.(value)}
@@ -18,7 +18,7 @@ export class OnlineRoom {
   this.status('Connecting to matchmaking server…');
   try{
    const Peer=await this.peerClass();const peer=new Peer('pcc-room-'+this.room.toLowerCase(),{debug:0});this.peer=peer;
-   peer.on('open',()=>this.status('Room '+this.room+' ready — share the code with a friend'));
+   peer.on('open',()=>{this.status('Hosting — friends can join from your profile');this.onHosted?.(this.room,this.course)});
    peer.on('connection',connection=>{
     if(this.connection&&this.connection.open){connection.on('open',()=>connection.send({type:'error',message:'Room full'}));connection.on('open',()=>connection.close());return}
     this.attach(connection);

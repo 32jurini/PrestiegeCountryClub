@@ -68,3 +68,11 @@ body:has(#bagPanel:not([hidden])) .game-banner{top:3vh}
 .rival-stats{position:absolute;right:16px;top:98px;background:#12271eea;border:1px solid #d6c390;padding:9px 13px;z-index:6;color:#fff;font:12px 'DM Sans',sans-serif;display:grid;gap:4px;pointer-events:none}
 .rival-stats[hidden]{display:none!important}.rival-stats strong{color:#efd394;font:600 14px Oswald}
 @media(max-width:700px){.rival-stats{top:90px;right:8px;font-size:10px}.top-actions #onlineOpen{font-size:9px}}
+
+/* Friends matchmaking */
+.online-card h3{font:600 15px Oswald,sans-serif;color:#e4cb90;margin:17px 0 5px}
+#friendsLogin[hidden],#friendsContent[hidden],#onlineCopy[hidden]{display:none!important}
+.friend-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #4b6255;font:12px 'DM Sans',sans-serif}
+.friend-row span{flex:1;min-width:140px}
+.friend-row button{background:#d9bd81;color:#13251d;border:0;font:600 11px Oswald,sans-serif;padding:7px 10px;cursor:pointer}
+#friendsMe{font:600 13px Oswald,sans-serif;color:#f2d69a}
