@@ -36,3 +36,7 @@ body:not(.gated) #topbar,body:not(.gated) #bottomNav{pointer-events:auto}
 .iron-details{font:500 9px 'DM Sans',sans-serif;letter-spacing:.5px;color:#e1e1d2;margin-top:7px;min-height:12px}
 .iron-bag.iron-selected{border-top-color:#e2cc97}
 @media(max-width:700px){.game-bottom .swing-zone{width:min(400px,calc(100vw - 16px))}.iron-options button{padding:6px 1px;font-size:11px}.iron-shape button{font-size:9px}.iron-bag-title span{display:none}}
+
+/* Show iron options and shot-shape controls only while an iron is equipped. */
+#ironBag:not(.iron-selected){display:none!important}
+#ironBag.iron-selected{display:block}
