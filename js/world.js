@@ -130,5 +130,5 @@ export class World{
   if(z<=76&&z>=this.getGreenZ()&&Math.abs(x-this.fairwayX(z))<=this.station(z,2))return 'FAIRWAY';
   return 'ROUGH';
  }
- ground(x,z){const lie=this.lie(x,z);return this.groundHeight(x,z)+(lie==='ROUGH'?0:lie==='GREEN'?.055:lie==='BUNKER'?.10:lie==='WATER'?.08:.045)}
+ ground(x,z){if((x/8)**2+((z-70)/6)**2<=1)return this.groundHeight(x,z)+.05;const lie=this.lie(x,z);return this.groundHeight(x,z)+(lie==='ROUGH'?0:lie==='GREEN'?.055:lie==='BUNKER'?.10:lie==='WATER'?.08:.045)}
 }

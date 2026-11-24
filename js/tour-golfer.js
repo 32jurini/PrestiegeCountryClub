@@ -14,7 +14,7 @@ function texture(name) {
 }
 export function loadFittedModel(frame) {
  if(!models.has(frame)){
-  const geometry=fetch(asset(frame+'.zip?v=hem')).then(response=>{
+  const geometry=fetch(asset(frame+'.zip?v=teegear')).then(response=>{
    if(!response.ok)throw Error('Could not load golfer geometry');
    return response.arrayBuffer();
   }).then(bytes=>JSZip.loadAsync(bytes)).then(zip=>zip.file('mesh.json').async('string')).then(JSON.parse);
@@ -43,11 +43,23 @@ export function fitToRig(actor,[data,maps]) {
  const shoes=surface(maps[2],.78),eyes=surface(maps[3],.32);
  const strands={side:T.DoubleSide,alphaTest:.28};
  const brows=surface(maps[4],.92,strands),hair=surface(maps[5],.84,strands);
- const mesh=new T.SkinnedMesh(geometry,[skin,shirt,pants,shoes,eyes,brows,hair]);
+ const cap=new T.MeshStandardMaterial({color:0x213b45,roughness:.9,side:T.DoubleSide});
+ const leather=new T.MeshStandardMaterial({color:0x433027,roughness:.65,side:T.DoubleSide});
+ const buckle=new T.MeshStandardMaterial({color:0xb8b8ac,metalness:.55,roughness:.34,side:T.DoubleSide});
+ const mesh=new T.SkinnedMesh(geometry,[skin,shirt,pants,shoes,eyes,brows,hair,cap,leather,buckle]);
  actor.model.traverse(o=>{if(o.isSkinnedMesh)o.visible=false});
  actor.root.add(mesh);actor.model.attach(mesh);actor.root.updateMatrixWorld(true);
  mesh.bind(new T.Skeleton(joints));mesh.normalizeSkinWeights();
  mesh.frustumCulled=false;mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData.fitted=true;
+ // Keep the lowest sole vertex in each small patch, including the toes and heels.
+ const patches=new Map(),position=geometry.getAttribute('position');
+ for(const i of data.groups[3]){
+  const x=position.getX(i),y=position.getY(i),z=position.getZ(i);
+  if(y>.115)continue;
+  const key=Math.floor(x/.045)+','+Math.floor(z/.045),previous=patches.get(key);
+  if(previous===undefined||position.getY(previous)>y)patches.set(key,i);
+ }
+ actor.soles={mesh,indices:[...patches.values()],point:new T.Vector3()};
  return {skin,shirt,pants,eyes,hair,brows};
 }
 

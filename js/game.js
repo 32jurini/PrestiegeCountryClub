@@ -1,7 +1,7 @@
 import {contactTime} from './shot-pose.js?v=approach2';
 import * as THREE from 'three';
-import {World,COURSES} from './world.js?v=approach2';
-import {Golfer} from './actors.js?v=humanfit';
+import {World,COURSES} from './world.js?v=teegear';
+import {Golfer} from './actors.js?v=teegear';
 const clamp=THREE.MathUtils.clamp,$=id=>document.getElementById(id);
 const BALL_RADIUS = .029;
 const CLUBS={driver:{name:'DRIVER',speed:43,loft:.395,range:255},iron:{name:'7 IRON',speed:28,loft:.49,range:160},wedge:{name:'WEDGE',speed:21,loft:.78,range:75},putter:{name:'PUTTER',speed:11,loft:.015,range:35}};
@@ -84,7 +84,7 @@ export class GolfGame{
   $('shotPreviewText').textContent = CLUBS[this.club].name + ' · ' + carry + ' YDS CARRY · ' + Math.round(this.aim) + '° AIM';
  }
  enterMenu(){this.started=false;this.previewMode=false;this.shotPreview.group.visible=false;this.world.create('royal',0);this.ball.visible=false;this.golfer.setVisible(false);this.coachActor?.setVisible(false);this.camera.position.set(39,37,110);this.camera.lookAt(-4,3,-45)}
- enterPreview(){this.previewMode=true;this.golfer.club.visible=false;this.golfer.setVisible(true);this.golfer.root.position.set(0,this.world.ground(0,67),67);this.golfer.root.rotation.set(0,Math.PI,0);this.golfer.animate('idle',true)}
+ enterPreview(){this.golfer.stanceGround=null;this.previewMode=true;this.golfer.club.visible=false;this.golfer.setVisible(true);this.golfer.root.position.set(0,this.world.ground(0,67),67);this.golfer.root.rotation.set(0,Math.PI,0);this.golfer.animate('idle',true)}
  async begin(course='royal',tutorial=false){await this.golferReady;this.tutorial=tutorial;this.course=course;this.scores=[];if(tutorial)await this.loadCoach();this.startHole(0);if(tutorial){this.coachActor?.setVisible(true);this.positionCoach()}}
  resetBallToTee() {
   this.position.copy(this.world.teePosition);
@@ -99,7 +99,7 @@ export class GolfGame{
   return new THREE.Vector3(Math.sin(angle),0,-Math.cos(angle));
  }
  placeGolfer(name=this.shotName()){
-  this.golfer.alignShot(name,this.position,this.shotDirection(),this.position.y-BALL_RADIUS);
+  this.golfer.alignShot(name,this.position,this.shotDirection(),this.world.ground(this.position.x,this.position.z),(x,z)=>this.world.ground(x,z));
   if(name!=='tee')this.golfer.address(name);
  }
  notify(t){$('banner').textContent=t}

@@ -3,7 +3,7 @@
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/","jszip":"https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm"}}</script>
 <script type="module">
 import * as T from 'three';
-import {Golfer} from './js/actors.js?v=humanfit';
+import {Golfer} from './js/actors.js?v=teegear';
 import {contactTime} from './js/shot-pose.js';
 const report=document.querySelector('#results'), rows=[];
 function check(ok,message){if(!ok)throw Error(message)}
@@ -16,10 +16,20 @@ try {
    const angle=T.MathUtils.degToRad(degrees),line=new T.Vector3(Math.sin(angle),0,-Math.cos(angle));
    const ball=new T.Vector3(4,.529,-12);
    for(const [name,time] of Object.entries(contactTime)){
-    actor.alignShot(name,ball,line,.5);
+    const ground=(x,z)=>.5+(x-ball.x)*.008+(z-ball.z)*.012;
+    actor.alignShot(name,ball,line,.5,ground);
     actor.shot(name);
     const tip=name==='tee'?[...actor.basePose.keys()].find(b=>b.name.endsWith('RightHandIndex3')):actor.clubHead;
-    function sample(dt){actor.update(dt);return tip.getWorldPosition(new T.Vector3())}
+    function sample(dt){
+     actor.update(dt);actor.root.updateMatrixWorld(true);
+     const {mesh,indices,point}=actor.soles;
+     const gap=Math.min(...indices.map(i=>{
+      mesh.getVertexPosition(i,point).applyMatrix4(mesh.matrixWorld);
+      return point.y-ground(point.x,point.z);
+     }));
+     check(Math.abs(gap)<.002,frame+' '+name+' hovering or sinking');
+     return tip.getWorldPosition(new T.Vector3());
+    }
     const before=sample(time-1/60),impact=sample(1/60),after=sample(1/60);
     check(impact.distanceTo(ball)<(name==='tee'?.10:.035),frame+' '+name+' misses ball');
     const travel=name==='tee'?impact.clone().sub(actor.root.position):after.sub(before);

@@ -1,5 +1,5 @@
-import {loadFittedModel,fitToRig,tintGolfer} from './tour-golfer.js?v=humanfit';
-import {measureShot} from './shot-pose.js?v=approach2';
+import {loadFittedModel,fitToRig,tintGolfer} from './tour-golfer.js?v=teegear';
+import {measureShot,contactTime} from './shot-pose.js?v=approach2';
 import * as THREE from 'three';
 import {FBXLoader} from 'three/addons/loaders/FBXLoader.js';
 import JSZip from 'jszip';
@@ -48,7 +48,20 @@ export class Golfer{
  setClub(type) {
   this.clubHead.scale.set(type==='driver'?.095:.078,type==='putter'?.022:.044,type==='driver'?.075:.035);
  }
- alignShot(name, ball, direction, floor) {
+ groundShoes() {
+  if(!this.soles||!this.stanceGround)return;
+  this.root.updateMatrixWorld(true);
+  const {mesh,indices,point}=this.soles;
+  let gap=Infinity;
+  for(const i of indices){
+   mesh.getVertexPosition(i,point).applyMatrix4(mesh.matrixWorld);
+   gap=Math.min(gap,point.y-this.stanceGround(point.x,point.z));
+  }
+  // model.position is in the unscaled golfer root's coordinates.
+  if(Number.isFinite(gap))this.model.position.y-=gap;
+ }
+ alignShot(name, ball, direction, floor, ground=null) {
+  this.stanceGround=ground;
   this.model.position.y=this.restHeight;
   if(!this.poses.has(name)) {
    const pose=measureShot(this,name,THREE);
@@ -62,6 +75,15 @@ export class Golfer{
   this.root.rotation.y=Math.atan2(direction.x,direction.z)-pose.yaw;
   const offset=pose.point.clone().applyQuaternion(this.root.quaternion);
   this.root.position.set(ball.x-offset.x,floor,ball.z-offset.z);
+  if(ground&&this.soles&&name!=='tee'){
+   // Refit contact to the ball after planting the shoes on this particular slope.
+   const action=this.actions.get(name);
+   this.mixer.stopAllAction();action.reset().play();action.time=contactTime[name];this.mixer.update(0);
+   this.groundShoes();
+   const target=this.club.parent.worldToLocal(ball.clone());
+   this.club.quaternion.setFromUnitVectors(new THREE.Vector3(0,-1,0),target.clone().normalize());
+   this.club.scale.setScalar(target.length());action.stop();
+  }
  }
  address(name) {
   this.endAt=0;
@@ -71,7 +93,7 @@ export class Golfer{
   this.mixer.stopAllAction();
   action.reset().play();action.paused=true;
   this.mixer.update(0);
-  this.mode=name;this.proceduralName='none';
+  this.mode=name;this.proceduralName='none';this.groundShoes();
  }
  async loadLocal(url) {
   const coach = url.endsWith('/Timmy.fbx');
@@ -135,7 +157,7 @@ export class Golfer{
   this.mixer.update(dt);
   if(this.proceduralName!=='none')this.proceduralPose(dt);
   const action=this.actions.get(this.mode);
-  if(this.mode==='tee' && this.toes.length){
+  if(this.soles&&this.stanceGround){this.groundShoes()}else if(this.mode==='tee' && this.toes.length){
    const position=new THREE.Vector3();
    const height=Math.min(...this.toes.map(toe=>this.root.worldToLocal(toe.getWorldPosition(position)).y));
    this.model.position.y+=.04-height;
