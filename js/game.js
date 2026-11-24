@@ -1,6 +1,6 @@
 import {contactTime} from './shot-pose.js';
 import * as THREE from 'three';
-import {World,COURSES} from './world.js?v=tidal2';
+import {World,COURSES} from './world.js?v=turf1';
 import {Golfer} from './actors.js?v=shotline2';
 const clamp=THREE.MathUtils.clamp,$=id=>document.getElementById(id);
 const BALL_RADIUS = .095;
