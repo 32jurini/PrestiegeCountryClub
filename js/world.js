@@ -1,3 +1,4 @@
+import {waterMaterial,coastalBank,shoreX} from './water.js';
 import {landscape,fairwayCollar,sandFinish,cartPath} from './course-landscape.js';
 import {TreeContact} from './tree-contact.js';
 import {plantTrees,horizon,detailSurface,frameHole,cutBunkers} from './course-detail.js?v=clubcraft';
@@ -30,7 +31,7 @@ COURSES.range={...COURSES.royal,name:'DRIVING RANGE',wind:0,holes:[{
 const clamp=THREE.MathUtils.clamp;
 const rand=(n)=>{const x=Math.sin(n*178.126+78.77)*42375.935;return x-Math.floor(x)};
 export class World{
- constructor(scene){this.scene=scene;this.root=new THREE.Group();scene.add(this.root);this.tmp=new THREE.Vector3();this.current='royal';this.holeIndex=0;this.hole={yards:278,par:4,curve:0};this.length=158;this.holePosition=new THREE.Vector3(0,0,0);this.teePosition=new THREE.Vector3(0,0,0);this.fairways=[];this.bunkers=[];this.water=[];this.green=null;this.flag=null;this.grassTexture=this.makeGrassTexture(false);this.fairwayTexture=this.makeGrassTexture(true);this.create('royal',0)}
+ constructor(scene){this.waterClock={value:0};this.scene=scene;this.root=new THREE.Group();scene.add(this.root);this.tmp=new THREE.Vector3();this.current='royal';this.holeIndex=0;this.hole={yards:278,par:4,curve:0};this.length=158;this.holePosition=new THREE.Vector3(0,0,0);this.teePosition=new THREE.Vector3(0,0,0);this.fairways=[];this.bunkers=[];this.water=[];this.green=null;this.flag=null;this.grassTexture=this.makeGrassTexture(false);this.fairwayTexture=this.makeGrassTexture(true);this.create('royal',0)}
  makeGrassTexture(fairway=false){const c=document.createElement('canvas');c.width=512;c.height=512;const x=c.getContext('2d');x.fillStyle=fairway?'#6f9857':'#3e6840';x.fillRect(0,0,512,512);let seed=fairway?91:27;const rnd=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};for(let i=0;i<12500;i++){const a= fairway?`rgba(${80+Math.floor(rnd()*55)},${112+Math.floor(rnd()*60)},${48+Math.floor(rnd()*34)},${.08+rnd()*.2})`:`rgba(${20+Math.floor(rnd()*50)},${55+Math.floor(rnd()*55)},${24+Math.floor(rnd()*30)},${.08+rnd()*.24})`;x.fillStyle=a;const w=1+rnd()*3;x.fillRect(rnd()*512,rnd()*512,w,.7+rnd()*2)}if(fairway){x.fillStyle='rgba(216,233,165,.12)';x.fillRect(0,0,512,256)}const tex=new THREE.CanvasTexture(c);tex.wrapS=tex.wrapT=THREE.RepeatWrapping;tex.repeat.set(fairway?2:22,fairway?3:22);tex.anisotropy=8;return tex}
  mat(color,rough=1){return new THREE.MeshStandardMaterial({color,roughness:rough,metalness:0})}
  mesh(geo,mat,par=this.root){const m=new THREE.Mesh(geo,mat);m.receiveShadow=true;m.castShadow=true;par.add(m);return m}
@@ -51,7 +52,7 @@ export class World{
   let sandDepth=0;
   for(const [cx,d,rx,rz] of this.hole.sand){
    const u=(x-cx)/rx,v=(z-70+d)/rz, radius=Math.hypot(u,v)/this.bunkerEdge(Math.atan2(v,u));
-   sandDepth+=.68*(1-THREE.MathUtils.smoothstep(radius,.53,1.08));
+   sandDepth+=.68*(1-THREE.MathUtils.smoothstep(radius,.53,1.08))-.15*Math.exp(-((radius-1.06)**2)/.012);
   }
   // A continuous valley floor joins the playable shelves to the surrounding ridges.
   const ridge=this.current==='misty'?THREE.MathUtils.smoothstep(edge,4,108)*
@@ -63,7 +64,7 @@ export class World{
   return landform+ridge+hills-sandDepth+ this.station(z,3)+.5*Math.sin(x*.053)*Math.sin(z*.025)+.26*Math.sin(z*.049+x*.017)}
  getGreenZ(){return 70-this.length}
  fairwayX(z){return this.station(z,1)}
- greenEdge(a){return 1+.06*Math.sin(2*a+.5)+.085*Math.cos(3*a-.4)}
+ greenEdge(a){return 1+.06*Math.sin(2*a+.5)+.085*Math.cos(3*a-.4)+.019*Math.sin(7*a+this.holeIndex*.7)}
  bunkerEdge(a){return 1+.14*Math.sin(3*a+.5)+.08*Math.cos(5*a)}
  surfaceEllipse(x,z,rx,rz,material,lift,scalloped=false,inner=0) {
   const geometry=new THREE.RingGeometry(inner,1,96,14);
@@ -116,8 +117,8 @@ export class World{
   terrain.setAttribute('color',new THREE.Float32BufferAttribute(shades,3));gmat.vertexColors=true;
  }
  terrain.computeVertexNormals();const base=this.mesh(terrain,gmat);base.castShadow=false;
- const fair=this.mat(c.fairway);fair.map=this.fairwayTexture;fair.color.set(c.fairway);const fringe=this.mat(0x679052);const greenMat=this.mat(0x91b979);const teeMat=this.mat(0x6da461);const sand=this.mat(0xd5c5a0);const lakeMat=new THREE.MeshPhysicalMaterial({color:0x327c91,metalness:.05,roughness:.2,transparent:true,opacity:.88,clearcoat:.9});
- for(const mat of [greenMat,teeMat,fair,gmat,fringe])detailSurface(mat);detailSurface(lakeMat,true);for(const mat of [gmat,fair,teeMat,fringe,greenMat])cutBunkers(mat,h.sand);
+ const fair=this.mat(c.fairway);fair.map=this.fairwayTexture;fair.color.set(c.fairway);const fringe=this.mat(0x679052);const greenMat=this.mat(0x91b979);const teeMat=this.mat(0x6da461);const sand=this.mat(0xd5c5a0);
+ for(const mat of [greenMat,teeMat,fair,gmat,fringe])detailSurface(mat);for(const mat of [gmat,fair,teeMat,fringe,greenMat])cutBunkers(mat,h.sand);
  this.teePosition.set(0,this.groundHeight(0,70)+.04,70);this.holePosition.set(this.fairwayX(this.getGreenZ()),0,this.getGreenZ());this.holePosition.y=this.groundHeight(this.holePosition.x,this.holePosition.z)+.035;
  const strips=150,lanes=24,verts=[],uv=[],indices=[];
  for(let i=0;i<=strips;i++){
@@ -139,18 +140,18 @@ export class World{
  this.surfaceEllipse(this.green.x,this.green.z,...h.green,greenMat,.055,'green');
  this.holePosition.y=this.groundHeight(this.green.x,this.green.z)+.06;
  const holeRing=this.mesh(new THREE.RingGeometry(.12,.29,28),this.mat(0xe5e5de));holeRing.rotation.x=-Math.PI/2;holeRing.position.copy(this.holePosition).add(new THREE.Vector3(0,.016,0));const cup=this.mesh(new THREE.CircleGeometry(.12,24),this.mat(0x101715));cup.rotation.x=-Math.PI/2;cup.position.copy(this.holePosition).add(new THREE.Vector3(0,.02,0));
- for(const [features,collection,material] of [[h.sand,this.bunkers,sand],[h.water,this.water,lakeMat]]){
+ for(const [features,collection,material] of [[h.sand,this.bunkers,sand],[h.water,this.water,null]]){
   for(const [x,distance,rx,rz] of features){
    const z=70-distance;collection.push({x,z,rx,rz});if(collection===this.bunkers)this.surfaceEllipse(x,z,rx*1.045,rz*1.045,this.mat(0x645b39),.082,true,.953);
-   this.surfaceEllipse(x,z,rx,rz,material,.10,collection===this.bunkers);
+   this.surfaceEllipse(x,z,rx,rz,material||waterMaterial(this.waterClock,name==='ocean',{x,z,rx,rz}),.10,collection===this.bunkers);
   }
  }
  if(name==='ocean'){
-  const sea=this.mesh(new THREE.PlaneGeometry(338,650,40,90),lakeMat);
+  const sea=this.mesh(new THREE.PlaneGeometry(338,650,130,180),waterMaterial(this.waterClock,true));
   sea.geometry.rotateX(-Math.PI/2);
   const v=sea.geometry.attributes.position;
-  for(let i=0;i<v.count;i++){const x=v.getX(i)+207,z=v.getZ(i);v.setXYZ(i,x,this.groundHeight(x,z)+.08,z)}
-  sea.geometry.computeVertexNormals();sea.castShadow=false;
+  for(let i=0;i<v.count;i++){const z=v.getZ(i),shore=shoreX(z),x=shore+(v.getX(i)+169)*(376-shore)/338;v.setXYZ(i,x,this.groundHeight(x,z)+.08,z)}
+  sea.geometry.computeVertexNormals();sea.castShadow=false;coastalBank(this,this.waterClock);
  }
  if(name!=='range')cartPath(this);
  const planting=landscape(this);
@@ -183,7 +184,7 @@ export class World{
  lie(x,z){
 
   const inside=area=>((x-area.x)/area.rx)**2+((z-area.z)/area.rz)**2<1;
-  if((this.current==='ocean'&&x>=38)||this.water.some(inside))return 'WATER';
+  if((this.current==='ocean'&&x>=shoreX(z))||this.water.some(inside))return 'WATER';
   if(this.bunkers.some(b=>{const u=(x-b.x)/b.rx,v=(z-b.z)/b.rz;return Math.hypot(u,v)<this.bunkerEdge(Math.atan2(v,u))}))return 'BUNKER';
   const u=(x-this.green.x)/this.green.rx,v=(z-this.green.z)/this.green.rz;
   if(Math.hypot(u,v)<this.greenEdge(Math.atan2(v,u)))return 'GREEN';
