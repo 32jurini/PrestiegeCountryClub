@@ -1,3 +1,4 @@
+import {WEDGES} from './wedges.js';
 import * as T from 'three';
 import {IRONS} from './irons.js';
 
@@ -117,15 +118,24 @@ export function clubModel(id){
   const mark=new T.Mesh(new T.BoxGeometry(.003,.001,.022),paint);mark.position.set(0,.018,-.012);head.add(mark);
  }else if(IRONS[id]){
   forgedIron(head,id);
- }else{
-  const toe=.039;
-  const outline=[[-.051,-.014],[-.041,-.021],[.035,-.020],[.053,-.014],[.058,.001],[.055,toe-.005],[.043,toe],[.018,toe-.002],[-.039,.012],[-.051,.005]];
-  const blade=new T.Group();head.add(blade);blade.rotation.x=-.65;
-  plate(blade,outline,.014,nickel,-.010);
-  stripes(blade,6,-.030,.042,-.014,.0044,.006,sole);
-  plate(blade,[[-.035,-.012],[.041,-.012],[.045,.011],[.028,.014],[-.03,.003]],.002,insert,-.0135);
-  plate(blade,[[-.038,-.016],[.046,-.015],[.044,-.008],[.019,-.005],[-.036,-.010]],.004,nickel,-.019);
-
+ }else if(WEDGES[id]){
+  const spec=WEDGES[id],toe=.034+(spec.degrees-46)*.0008;
+  const outline=[[-.057,-.009],[-.051,-.017],[-.027,-.021],[.026,-.017],[.046,-.009],
+   [.043,.004],[.030,.014],[-.013,toe-.004],[-.038,toe+.003],[-.054,toe-.002],[-.060,.010]];
+  const blade=new T.Group();head.add(blade);
+  blade.rotation.x=-T.MathUtils.degToRad(spec.degrees);
+  plate(blade,outline,.008,nickel,-.008);
+  for(let row=0;row<10;row++){
+   const y=-.012+row*.0046;
+   stripes(blade,1,-.048,Math.min(.031,.043-y*2.1),y,0,.0015,sole);
+  }
+  // Sweep the sole back from the leading edge with a raised rear lip.
+  const section=new T.Shape(),width=spec.soleWidth;
+  section.moveTo(0,0);section.quadraticCurveTo(width*.32,-.002,width,.001+width*Math.tan(T.MathUtils.degToRad(spec.bounce)));
+  section.lineTo(width*.8,.011);section.lineTo(0,.012);section.closePath();
+  const grind=new T.Mesh(new T.ExtrudeGeometry(section,{depth:.074,bevelEnabled:true,bevelSize:.0014,bevelThickness:.0014,bevelSegments:3}),nickel);
+  grind.rotation.y=Math.PI/2;grind.position.set(-.043,-.016,.007);head.add(grind);
+  pin(head,[.034,-.001,-.004],heelSocket(id).toArray(),.009,.007,nickel);
  }
  const group=new T.Group();group.add(head);
  group.traverse(o=>{if(o.isMesh)o.castShadow=true});templates.set(id,group);return group.clone();
@@ -134,7 +144,7 @@ export function clubModel(id){
 export function heelSocket(id){
  const size=id==='wood'?.84:id==='hybrid'?.72:1;
  if(['driver','wood','hybrid'].includes(id))return new T.Vector3(.055*size,.006*(id==='driver'?1:size*.88),-.010*size);
- if(IRONS[id])return new T.Vector3(.056,.036,-.005);
+ if(IRONS[id]||WEDGES[id])return new T.Vector3(.056,.036,-.005);
  return id==='putter'?new T.Vector3(.044,.012,-.013):new T.Vector3(-.039,0,-.004);
 }
 export function makeShaft(){

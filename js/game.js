@@ -1,18 +1,16 @@
-import {buildBag} from './golf-bag.js?v=contact1';
+import {WEDGES,wedgeLaunch} from './wedges.js';
+import {buildBag} from './golf-bag.js?v=wedges1';
 import {contactTime} from './shot-pose.js?v=approach2';
 import {CLUB_IRONS,curveAcceleration} from './irons.js?v=irons1';
 import * as THREE from 'three';
 import {World,COURSES} from './world.js?v=clubcraft';
-import {Golfer} from './actors.js?v=contact1';
+import {Golfer} from './actors.js?v=wedges1';
 const clamp=THREE.MathUtils.clamp,$=id=>document.getElementById(id);
 const SHAPES=['HOOK','DRAW','STRAIGHT','FADE','SLICE'];
 const BAG_TAGS={driver:'Driver',wood:'3W',hybrid:'4H',pitching:'PW',approach:'AW',wedge:'SW',lob:'LW',putter:'Putter'};
 const BALL_RADIUS = .029;
 const CLUBS={driver:{name:'DRIVER',speed:43,loft:.395,range:255},wood:{name:'3 WOOD',speed:39.8,loft:.42,range:228},hybrid:{name:'4 HYBRID',speed:42.2,loft:.315,range:191},...CLUB_IRONS,
- pitching:{name:'PITCHING WEDGE',speed:26,loft:.57,range:112,wedge:true},
- approach:{name:'APPROACH WEDGE',speed:23.8,loft:.64,range:99,wedge:true},
- wedge:{name:'SAND WEDGE',speed:21,loft:.78,range:77,wedge:true},
- lob:{name:'LOB WEDGE',speed:18.5,loft:.84,range:56,wedge:true},putter:{name:'PUTTER',speed:11,loft:.015,range:35}};
+ ...WEDGES,putter:{name:'PUTTER',speed:11,loft:.015,range:35}};
 export class GolfGame{
  constructor(renderer,scene,camera){this.renderer=renderer;this.scene=scene;this.camera=camera;this.world=new World(scene);this.golfer=new Golfer(scene);this.ball=this.makeBall();this.contactShadow=this.makeContactShadow();this.clock=new THREE.Clock();this.position=new THREE.Vector3();this.vel=new THREE.Vector3();this.swinging=false;this.swingTimer=0;this.ballLaunchDelay=.9;this.charge=0;this.charging=false;this.shots=0;this.scores=[];this.course='royal';this.index=0;this.started=false;this.aim=0;this.club='driver';this.lastIron='iron7';this.shotShape=0;this.flightShape=0;this.impactSpin=0;this.biteTimer=0;this.wind=0;this.modal=false;this.cameraTarget=new THREE.Vector3();this.dragging=false;this.dragStart=0;this.orbit=0;this.coachActor=null;this.onSfx=()=>{};this.shotPreview=this.createShotPreview();const gear=buildBag();this.bag=gear.bag;this.bagHeads=gear.heads;scene.add(this.bag);
  this.bagPhase=null;this.listeners();this.enterMenu()}
@@ -53,6 +51,12 @@ export class GolfGame{
  createShotPreview(){const group=new THREE.Group();this.scene.add(group);const mat=new THREE.LineBasicMaterial({color:0x35d4ff,transparent:true,opacity:.9,depthTest:false});const line=new THREE.Line(new THREE.BufferGeometry(),mat);line.renderOrder=50;group.add(line);const marker=new THREE.Mesh(new THREE.RingGeometry(.8,1.07,48),new THREE.MeshBasicMaterial({color:0x50e9ff,transparent:true,opacity:.9,side:THREE.DoubleSide,depthTest:false}));marker.rotation.x=-Math.PI/2;marker.renderOrder=50;group.add(marker);group.visible=false;return{group,line,marker}}
  launchVelocity(power) {
   const club = CLUBS[this.club], lie = this.world.lie(this.position.x, this.position.z);
+  if(WEDGES[this.club]){
+   const {horizontal,vertical}=wedgeLaunch(club,power,lie);
+   const velocity=this.shotDirection().multiplyScalar(horizontal);
+   velocity.y=vertical;
+   return velocity;
+  }
   const surface = lie === 'BUNKER' ? .68 : lie === 'ROUGH' ? .84 : 1;
   const speed = club.speed * Math.pow(power, .8) * surface;
   const velocity = this.shotDirection().multiplyScalar(speed * Math.sqrt(1 - club.loft ** 2));
@@ -90,7 +94,7 @@ export class GolfGame{
   marker.position.copy(point);
   marker.position.y += .07;
   const carry = Math.round(Math.hypot(point.x-this.position.x,point.z-this.position.z)*1.75);
-  $('shotPreviewText').textContent = CLUBS[this.club].name + ' · ' + carry + ' YDS CARRY · ' + SHAPES[this.shotShape+2] + ' · ' + Math.round(this.aim) + '° AIM';
+  $('shotPreviewText').textContent = CLUBS[this.club].name + (WEDGES[this.club]?' '+WEDGES[this.club].degrees+'°':'') + ' · ' + carry + ' YDS CARRY · ' + SHAPES[this.shotShape+2] + ' · ' + Math.round(this.aim) + '° AIM';
  }
  enterMenu(){this.clearBag();this.started=false;this.previewMode=false;this.shotPreview.group.visible=false;this.world.create('royal',0);this.ball.visible=false;this.golfer.setVisible(false);this.coachActor?.setVisible(false);this.camera.position.set(39,37,110);this.camera.lookAt(-4,3,-45)}
  enterPreview(){this.golfer.stanceGround=null;this.previewMode=true;this.golfer.club.visible=false;this.golfer.setVisible(true);this.golfer.root.position.set(0,this.world.ground(0,67),67);this.golfer.root.rotation.set(0,Math.PI,0);this.golfer.animate('idle',true)}
@@ -104,7 +108,7 @@ export class GolfGame{
   const stats=document.querySelector('.hole-stat');if(stats)stats.style.display=range?'none':'';
   if(range)$('holeLabel').textContent='PRACTICE TEE';
   this.notify(this.tutorial&&index===0?'COACH TIMMY: LET’S SET UP YOUR FIRST SHOT':hole.hint.toUpperCase());this.refresh()}
- shotName(){return this.club==='putter'?'putt':(CLUBS[this.club]?.wedge||CLUBS[this.club]?.isIron)?'chip':'drive'}
+ shotName(){return this.club==='putter'?'putt':(WEDGES[this.club]||CLUBS[this.club]?.isIron)?'chip':'drive'}
  shotDirection(){
   const pin=this.world.holePosition.clone().sub(this.position);
   const angle=Math.atan2(pin.x,-pin.z)+this.aim*Math.PI/180;
@@ -254,7 +258,7 @@ export class GolfGame{
   const descent=Math.max(0,-this.vel.y);
   if(descent>1.7&&this.club!=='putter'){
    this.onSfx('land');
-   const turfRetention=club.isIron?club.stop:club.wedge?.46:this.club==='driver'?.64:.75;
+   const turfRetention=club.stop??(this.club==='driver'?.64:.75);
    const retention=turfRetention*(sand?.23:green?.70:1);
    this.vel.x*=retention;this.vel.z*=retention;
    this.vel.y=descent*(sand?.045:green?.14:.24);
@@ -263,7 +267,8 @@ export class GolfGame{
    return;
   }
   // Catch shallow arrivals too, without applying the impact loss on every roll step.
-  const skid=first&&this.club!=='putter'?(sand?.24:green?.78:1):1;
+  const shallowRetention=WEDGES[this.club]?.stop??.78;
+  const skid=first&&this.club!=='putter'?(sand?.24:green?shallowRetention:1):1;
   const friction=sand?10:green?2.25:lie==='FAIRWAY'?2.8:5.5;
   const bite=club.isIron&&this.biteTimer>0?this.impactSpin/1700:0;
   this.biteTimer=Math.max(0,this.biteTimer-dt);
