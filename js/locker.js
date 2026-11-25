@@ -3,9 +3,14 @@ export const walletKey='prestiege-club-wallet-v1';
 export const catalog=[
  {id:'custom',slot:'shirt',name:'Creator polo',price:0,color:null},
  {id:'white',slot:'ball',name:'Classic white',price:0,color:'#f9f9f3'},
- {id:'links',slot:'shirt',name:'Links pinstripe',price:70,color:'#163e36',stripe:'#c5dec8'},
- {id:'marina',slot:'shirt',name:'Marina blue',price:50,color:'#3981ae'},
- {id:'claret',slot:'shirt',name:'Claret stripe',price:90,color:'#822c43',stripe:'#efb8a7'},
+ {id:'links',slot:'shirt',name:'Links pinstripe',price:70,pattern:'pinstripe'},
+ {id:'marina',slot:'shirt',name:'Marina sailor stripe',price:50,pattern:'breton'},
+ {id:'claret',slot:'shirt',name:'Club twin stripe',price:90,pattern:'twin'},
+ {id:'pane',slot:'shirt',name:'Windowpane check',price:65,pattern:'windowpane'},
+ {id:'argyle',slot:'shirt',name:'Highland argyle',price:100,pattern:'argyle'},
+ {id:'dot',slot:'shirt',name:'Tour microdot',price:45,pattern:'dot'},
+ {id:'tangerine',slot:'ball',name:'Tangerine',price:45,color:'#ff9d26'},
+ {id:'violet',slot:'ball',name:'Orchid',price:55,color:'#d493ff'},
  {id:'lemon',slot:'ball',name:'Tour yellow',price:20,color:'#eaff35'},
  {id:'coral',slot:'ball',name:'Sunset coral',price:35,color:'#ff694b'},
  {id:'ice',slot:'ball',name:'Glacier blue',price:50,color:'#7adaff'}

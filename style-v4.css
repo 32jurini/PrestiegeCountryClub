@@ -96,3 +96,9 @@ body:has(#bagPanel:not([hidden])) .game-banner{top:3vh}
 .swatch.ball{width:40px;border-radius:50%;box-shadow:inset -5px -6px 8px #0004}
 #bottomNav button{min-width:0}
 @media(max-width:650px){#topbar{padding:0 2%;gap:4px}#topbar .top-actions{gap:2px}#topbar .smallbtn{padding:5px 4px;font-size:9px}#topbar .mark small{display:none}#bottomNav button{letter-spacing:0}}
+
+.player-menu{display:flex;gap:clamp(5px,1.5vw,20px);align-items:center}
+#myPlay{white-space:nowrap;color:var(--cream)}
+#myPlay.selected{border-color:var(--gold);color:var(--gold)}
+.swatch.shirt{background-size:12px 12px}
+@media(max-width:600px){.player-menu .mark{display:none}}

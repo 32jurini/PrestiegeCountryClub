@@ -30,6 +30,15 @@ export function fitToRig(actor,[data,maps]) {
  if(joints.some(b=>!b))throw Error('Golfer rig mismatch');
  const geometry=new T.BufferGeometry();
  geometry.setAttribute('position',new T.Float32BufferAttribute(data.p.map(n=>n/10000),3));
+ // Reshape the rest mesh continuously across material seams, including the polo.
+ const points=geometry.getAttribute('position');
+ for(let i=0;i<points.count;i++){
+  const x=points.getX(i),y=points.getY(i),z=points.getZ(i);
+  const trunk=1-T.MathUtils.smoothstep(Math.abs(x),.18,.33);
+  const waist=Math.exp(-((y-1.08)**2)/.014)*trunk;
+  const chest=Math.exp(-((y-1.34)**2)/.012)*trunk;
+  points.setXYZ(i,x*(1-.055*waist+.025*chest),y,z*(1-.048*waist+.032*chest));
+ }
  geometry.setAttribute('uv',new T.Float32BufferAttribute(data.uv.map(n=>n/10000),2));
  geometry.setAttribute('skinIndex',new T.Uint16BufferAttribute(data.j,4));
  geometry.setAttribute('skinWeight',new T.Float32BufferAttribute(data.w.map(n=>n/255),4));
@@ -51,6 +60,13 @@ export function fitToRig(actor,[data,maps]) {
  actor.model.traverse(o=>{if(o.isSkinnedMesh)o.visible=false});
  actor.root.add(mesh);actor.model.attach(mesh);actor.root.updateMatrixWorld(true);
  mesh.bind(new T.Skeleton(joints));mesh.normalizeSkinWeights();
+ // Scale about each wrist and knuckle after binding. The finger chains keep their
+ // animated curl, and a grip attached at the wrist keeps its original pivot.
+ for(const joint of new Set(joints)){
+  if(/(?:Left|Right)Hand$/.test(joint.name))joint.scale.multiplyScalar(.91);
+  if(/Hand(?:Index|Middle|Ring|Pinky|Thumb)1$/.test(joint.name))joint.scale.multiplyScalar(.81);
+ }
+ actor.root.updateMatrixWorld(true);
  mesh.frustumCulled=false;mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData.fitted=true;
  // Keep the lowest sole vertex in each small patch, including the toes and heels.
  const patches=new Map(),position=geometry.getAttribute('position');

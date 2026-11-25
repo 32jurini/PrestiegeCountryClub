@@ -1,5 +1,5 @@
 import {clubModel,makeShaft,heelSocket} from './club-model.js?v=wedges1';
-import {loadFittedModel,fitToRig,tintGolfer} from './tour-golfer.js?v=canopy';
+import {loadFittedModel,fitToRig,tintGolfer} from './tour-golfer.js?v=myplay1';
 import {measureShot,contactTime} from './shot-pose.js?v=approach2';
 import * as THREE from 'three';
 import {FBXLoader} from 'three/addons/loaders/FBXLoader.js';

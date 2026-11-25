@@ -1,11 +1,12 @@
+import {poloTile} from './polo-patterns.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {lightClubs} from './club-model.js?v=wedges1';
 import * as THREE from 'three';
-import {GolfGame} from './game.js?v=wedges1';
+import {GolfGame} from './game.js?v=myplay1';
 import {SoundEngine} from './sound.js';
 import {OnlineRoom} from './online.js?v=friends1';
 import {FriendsService,isOnline} from './friends.js?v=friends1';
-import {walletKey,wallet,catalog,itemById,award,buy,wear} from './locker.js?v=2';
+import {walletKey,wallet,catalog,itemById,award,buy,wear} from './locker.js?v=myplay1';
 const $=id=>document.getElementById(id);
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(window.devicePixelRatio,1.6));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;$('viewport').appendChild(renderer.domElement);
 const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(54,innerWidth/innerHeight,.1,1100);const sun=new THREE.DirectionalLight(0xffe7c7,2.1);sun.position.set(-65,100,42);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-14;sun.shadow.camera.right=14;sun.shadow.camera.top=14;sun.shadow.camera.bottom=-14;sun.shadow.camera.near=.5;sun.shadow.camera.far=320;sun.shadow.normalBias=.009;sun.shadow.bias=-.00012;scene.add(sun.target);scene.add(sun);scene.add(new THREE.HemisphereLight(0xc3e8ff,0x55513e,1.25));
@@ -20,7 +21,7 @@ function sizeCanvas() {
  renderer.setSize(box.width, box.height);
 }
 new ResizeObserver(sizeCanvas).observe(preview);
-const showPage=id=>{if(id!=='playing'&&page==='playing'&&onlineActive)endOnline();page=id;document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===id));document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('selected',b.dataset.page===id));document.body.classList.toggle('is-playing',id==='playing');(id==='golfer'?preview:$('viewport')).appendChild(renderer.domElement);sizeCanvas();if(id!=='playing'){game.enterMenu();if(id==='golfer')game.enterPreview()}};
+const showPage=id=>{if(id!=='playing'&&page==='playing'&&onlineActive)endOnline();page=id;document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===id));document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('selected',b.dataset.page===id));document.body.classList.toggle('is-playing',id==='playing');(id==='golfer'?preview:$('viewport')).appendChild(renderer.domElement);sizeCanvas();if(id==='store'||id==='locker')renderGear();if(id!=='playing'){game.enterMenu();if(id==='golfer')game.enterPreview()}};
 const showError=msg=>{$('accountFeedback').textContent=msg;$('accountFeedback').classList.remove('hidden')};
 const hex=bytes=>Array.from(new Uint8Array(bytes)).map(b=>b.toString(16).padStart(2,'0')).join('');
 async function hashPassword(password){if(!globalThis.crypto?.subtle)throw new Error('Secure sign-in requires HTTPS. Open the published GitHub Pages website.');const bytes=new TextEncoder().encode(password);return hex(await crypto.subtle.digest('SHA-256',bytes))}
@@ -64,16 +65,20 @@ const palette=()=>({shirt:$('shirtColor').value,pants:$('pantsColor').value,hair
 function applyGear(){
  const {equipped}=wallet(),shirt=itemById(equipped.shirt),ball=itemById(equipped.ball);
  game.ball.material.color.set(ball.color);
- game.golfer.applyAppearance({...palette(),shirt:shirt.color||$('shirtColor').value});
+ game.golfer.applyAppearance(palette());
  const fabric=game.golfer.outfit?.shirt;
  if(!fabric||fabric.userData.finish===shirt.id)return;
  fabric.userData.finish=shirt.id;
- fabric.customProgramCacheKey=()=>shirt.stripe?shirt.id:'club-solid';
+ fabric.customProgramCacheKey=()=>shirt.pattern||'club-solid';
  fabric.onBeforeCompile=shader=>{
-  if(!shirt.stripe)return;
-  shader.uniforms.thread={value:new THREE.Color(shirt.stripe)};
-  shader.vertexShader='varying float fabricHeight;\n'+shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\n fabricHeight=position.y;');
-  shader.fragmentShader='uniform vec3 thread; varying float fabricHeight;\n'+shader.fragmentShader.replace('#include <map_fragment>','#include <map_fragment>\n float band=abs(fract(fabricHeight*25.0)-0.5); float aa=max(fwidth(fabricHeight*25.0),0.006); diffuseColor.rgb=mix(diffuseColor.rgb,thread,0.8*(1.0-smoothstep(0.055-aa,0.055+aa,band)));');
+  if(!shirt.pattern)return;
+  shader.uniforms.poloMask={value:poloTile(shirt.pattern).map};
+  shader.vertexShader='varying vec2 poloUV;\n'+shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\n poloUV=vec2(position.x + 0.6*position.z,position.y)*12.0;');
+  shader.fragmentShader='uniform sampler2D poloMask; varying vec2 poloUV;\n'+shader.fragmentShader.replace('#include <map_fragment>',`#include <map_fragment>
+   float ink=texture2D(poloMask,poloUV).a;
+   float lightness=dot(diffuse,vec3(.2126,.7152,.0722));
+   vec3 thread=mix(vec3(.91,.89,.80),vec3(.045,.065,.06),smoothstep(.14,.45,lightness));
+   diffuseColor.rgb=mix(diffuseColor.rgb,thread,ink*.78);`);
  };
  fabric.needsUpdate=true;
 }
@@ -91,7 +96,7 @@ function renderGear(){
     const card=document.createElement('div'),swatch=document.createElement('i'),name=document.createElement('strong'),action=document.createElement('button');
     card.className='gear-card';swatch.className='swatch '+slot;
     swatch.style.setProperty('--gear',item.color||$('shirtColor').value);
-    if(item.stripe)swatch.style.setProperty('--pattern','repeating-linear-gradient(0deg,transparent 0 6px,'+item.stripe+' 6px 7px)');
+    if(item.pattern)swatch.style.setProperty('--pattern',poloTile(item.pattern).swatch);
     name.textContent=item.name;action.className='glass';
     action.textContent=view==='locker'?(wearing?'Equipped':'Equip'):(owned?'Owned':'Buy · '+item.price+' credits');
     action.disabled=view==='locker'?wearing:owned||state.credits<item.price;
