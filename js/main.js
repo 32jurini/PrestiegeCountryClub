@@ -2,7 +2,7 @@ import {poloTile} from './polo-patterns.js?v=playergear1';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {lightClubs} from './club-model.js?v=wedges1';
 import * as THREE from 'three';
-import {GolfGame} from './game.js?v=coast2';
+import {GolfGame} from './game.js?v=tour72';
 import {SoundEngine} from './sound.js?v=coast1';
 import {OnlineRoom} from './online.js?v=friends1';
 import {FriendsService,isOnline} from './friends.js?v=friends1';
@@ -195,10 +195,11 @@ $('onlineHost').onclick=()=>{if(!friends.profile?.username){onlineStatus.textCon
 $('onlineJoin').onclick=()=>{if(!friends.profile?.username){onlineStatus.textContent='Register your online username first';return}room.join($('onlineJoinCode').value,friends.profile.username)};
 $('onlineCopy').onclick=()=>{if(room.room){navigator.clipboard?.writeText(room.room);onlineStatus.textContent='Room code copied — send it to your friend'}};
 const sunOffset=new THREE.Vector3(-39,53,27);
-function loop(){requestAnimationFrame(loop);const dt=Math.min(game.clock.getDelta(),.05);game.update(dt);if(onlineActive&&room.connected&&game.started&&performance.now()-lastSent>110){lastSent=performance.now();room.send(room.snapshot(game))}if(ghost.visible)ghost.position.lerp(remoteTarget,Math.min(1,dt*13));const dusk=game.world.current==='misty';
- if(sun.userData.dusk!==dusk){
-  sun.userData.dusk=dusk;sunOffset.set(...(dusk?[-24,12,-64]:[-39,53,27]));
-  sun.color.setHex(dusk?0xffbb85:0xffe7c7);sun.intensity=dusk?1.75:2.1;
+function loop(){requestAnimationFrame(loop);const dt=Math.min(game.clock.getDelta(),.05);game.update(dt);if(onlineActive&&room.connected&&game.started&&performance.now()-lastSent>110){lastSent=performance.now();room.send(room.snapshot(game))}if(ghost.visible)ghost.position.lerp(remoteTarget,Math.min(1,dt*13));const course=game.world.current;
+ if(sun.userData.course!==course){
+  sun.userData.course=course;
+  const settings=course==='misty'?[-24,12,-64,0xffbb85,1.75]:course==='ocean'?[-48,34,16,0xffe4bc,2.15]:course==='summit'?[29,55,-38,0xfff2df,2.02]:[-39,43,27,0xffdfb3,2.08];
+  sunOffset.set(settings[0],settings[1],settings[2]);sun.color.setHex(settings[3]);sun.intensity=settings[4];
  }
  sun.target.position.copy(game.position);sun.position.copy(game.position).add(sunOffset);renderer.render(scene,camera)}window.addEventListener('resize',sizeCanvas);loop();
 window.dispatchEvent(new Event('pcc-game-ready'));

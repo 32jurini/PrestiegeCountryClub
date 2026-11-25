@@ -11,10 +11,12 @@ export function waterMaterial(clock,coastal,area){
   shader.fragmentShader='varying vec3 waterPoint;uniform float tide,openSea,swell;uniform vec4 bank;\n'+shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
    vec2 p=waterPoint.xz;
    float depth=openSea>.5 ? max(0.,p.x-(38.+1.8*sin(p.y*.083)+1.2*cos(p.y*.19))) : max(0.,(1.-length((p-bank.xy)/bank.zw))*min(bank.z,bank.w));
-   float a=dot(p,vec2(.72,.38))+tide*1.5,b=dot(p,vec2(-1.12,1.52))-tide*1.8;
+   vec2 warped=p+vec2(sin(p.y*.12+p.x*.05),cos(p.x*.14-p.y*.06))*1.7;
+   float a=dot(warped,vec2(.72,.38))+tide*1.5,b=dot(warped,vec2(-1.12,1.52))-tide*1.8;
    float fineFade=1.-smoothstep(.04,.65,length(fwidth(p)));
    vec2 slope=swell*(vec2(.10,.05)*cos(a)+vec2(-.065,.09)*cos(b)+fineFade*.035*vec2(sin(3.*b+a),cos(4.*a-b)));
    slope+=fineFade*swell*.075*vec2(sin(dot(p,vec2(7.4,2.7))+1.4*sin(b)+tide*3.1),cos(dot(p,vec2(3.2,5.4))+sin(a)-tide*2.6));
+   slope*=mix(.12,1.,1.-smoothstep(.12,1.7,length(fwidth(p))));
    vec3 n=normalize(vec3(-slope.x,1.,-slope.y)),eye=normalize(cameraPosition-waterPoint);
    float fres=.05+.88*pow(1.-clamp(dot(n,eye),0.,1.),4.);
    float sandRipple=.5+.5*sin(p.x*8.+sin(p.y*.9)*2.);
@@ -26,8 +28,8 @@ export function waterMaterial(clock,coastal,area){
    float shine=pow(max(0.,1.-abs(dot(slope,normalize(eye.xz+vec2(.001))))*6.),5.);
    body+=vec3(.025,.049,.048)*shine*fineFade;
    float glint=pow(max(0.,dot(reflect(-eye,n),normalize(vec3(-.45,.45,.68)))),85.);
-   float foam=swell*(1.-smoothstep(.12,1.7,depth))*smoothstep(.1,.9,sin(depth*6.-tide*1.9+.8*sin(p.y*.9)));
-   diffuseColor.rgb=mix(mix(body,sky,fres)+glint*vec3(.9,.8,.58),vec3(.70,.80,.73),foam*.73);
+   float foam=swell*(1.-smoothstep(.12,1.7,depth))*smoothstep(.1,.9,sin(depth*4.-tide*1.5+2.2*sin(p.y*.9)+sin(p.x*2.1)));
+   diffuseColor.rgb=mix(mix(body,sky,fres)+glint*vec3(.9,.8,.58),vec3(.70,.80,.73),foam*.46);
   `);
  };
  return material;

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Putting surface clearance</title>
+<pre id="result">Checking all course layouts…</pre>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"}}</script>
+<script type="module">
+import {COURSES,World} from '../js/world.js?v=tour72';
+const result=document.getElementById('result');
+try{
+ let holes=0,checks=0;
+ for(const [course,layout] of Object.entries(COURSES)){
+  if(course==='range')continue;
+  for(const [index,hole] of layout.holes.entries()){
+   const world=Object.create(World.prototype),[distance,x]=hole.route.at(-1),z=70-distance;
+   const areas=features=>features.map(([x,d,rx,rz])=>({x,z:70-d,rx,rz}));
+   Object.assign(world,{current:course,holeIndex:index,hole,green:{x,z,rx:hole.green[0],rz:hole.green[1]},bunkers:areas(hole.sand),water:areas(hole.water)});
+   for(let deg=0;deg<360;deg++)for(const r of [0,.5,.96,.999,1.04]){
+    const a=deg*Math.PI/180,edge=r*world.greenEdge(a);
+    const lie=world.lie(x+edge*hole.green[0]*Math.cos(a),z+edge*hole.green[1]*Math.sin(a));
+    if(r<1?lie!=='GREEN':['WATER','BUNKER'].includes(lie))throw Error(course+' hole '+(index+1)+' at '+deg+'°: '+lie);
+    checks++;
+   }
+   holes++;
+  }
+ }
+ if(holes!==72)throw Error('Expected 72 holes; checked '+holes);
+ result.textContent='PASS — '+checks+' probes across '+holes+' greens and collars.';
+}catch(error){result.textContent='FAIL — '+error.message;throw error}
+</script></html>

@@ -77,7 +77,7 @@ export function fairwayCollar(world,material){
    for(const extra of [0,1.9]){
     const x=center+side*(w+extra);positions.push(x,world.groundHeight(x,z)+.029,z);uv.push(x*.032,z*.032);
    }
-   if(i<segments){const a=base+i*2;indices.push(a,a+1,a+2,a+1,a+3,a+2)}
+   if(i<segments){const a=base+i*2;if(side>0)indices.push(a,a+1,a+2,a+1,a+3,a+2);else indices.push(a,a+2,a+1,a+1,a+2,a+3)}
   }
  }
  const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(positions,3));g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));

@@ -43,8 +43,9 @@ export function horizon(world) {
  for(let j=0;j<=rows;j++){
   for(let i=0;i<=cols;i++){
    const a=i/cols*Math.PI*2,t=j/rows,r=285+130*t;
-   const ridge=18+9*Math.sin(5*a)+7*Math.cos(9*a)+5*Math.sin(19*a)+2*Math.sin(41*a);
-   const h=-8+Math.sin(t*Math.PI*.8)*ridge*(mountain?2.7:world.current==='royal'?.65:.32);
+   const az=a+world.holeIndex*.27;
+   const ridge=18+9*Math.sin(5*az)+7*Math.cos(9*a)+5*Math.sin(19*a)+2*Math.sin(41*a);
+   const h=-8+Math.sin(t*Math.PI*.8)*ridge*(mountain?2.7:world.current==='royal'?.65:.32)*(world.current==='ocean'?THREE.MathUtils.smoothstep(-Math.sin(a),-.15,.7):1);
    verts.push(r*Math.sin(a),h,-65+r*Math.cos(a));
    const shade=.83+.10*Math.cos(9*a)+.06*Math.sin(19*a);
    const c=new THREE.Color(mountain?0x697864:0x596f51).multiplyScalar(shade);
@@ -88,6 +89,15 @@ export function frameHole(world) {
   geometry.setAttribute('position',new THREE.Float32BufferAttribute(tips,3));geometry.computeVertexNormals();
  }
  const material=new THREE.MeshStandardMaterial({color:ocean?0x837e70:0x667547,roughness:.96,side:THREE.DoubleSide});
+ if(ocean){
+  const v=geometry.attributes.position;
+  for(let i=0;i<v.count;i++){
+   const x=v.getX(i),y=v.getY(i),z=v.getZ(i),grain=.90+.14*Math.sin(x*9+y*4+z*6);
+   v.setXYZ(i,x*grain+.12*y,Math.min(y*.85,.47+.18*x),z*grain);
+  }
+  geometry.computeVertexNormals();
+  material.flatShading=true;
+ }
  const count=ocean?110:2000;
  const mesh=new THREE.InstancedMesh(geometry,material,count);
  const pose=new THREE.Object3D(),color=new THREE.Color();
