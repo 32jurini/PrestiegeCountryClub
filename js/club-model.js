@@ -40,11 +40,16 @@ export function clubModel(id){
  if(templates.has(id))return templates.get(id).clone();
  const head=new T.Group(),wood=['driver','wood','hybrid'].includes(id),putt=id==='putter';
  if(wood){
-  const corners=[[-.052,-.014],[-.035,-.024],[.021,-.027],[.054,-.014],[.058,.004],[.043,.022],[.006,.029],[-.033,.025],[-.054,.011]];
+  const corners=[[-.052,-.014],[-.035,-.024],[.021,-.027],[.052,-.014],[.060,-.002],[.059,.011],[.046,.022],[.006,.029],[-.033,.025],[-.054,.011]];
   const profile=roundedOutline(corners).getSpacedPoints(54).slice(0,-1).map(p=>[p.x,p.y]);
   // A broad, flat titanium face closes a swept-back, tapered crown.
   const rings=[[1,0],[1.05,-.016],[1,-.039],[.78,-.067],[.38,-.084],[.05,-.09]];
-  const verts=[],idx=[];for(const [scale,z] of rings)for(const [x,y] of profile)verts.push(x*scale,y*scale+.005*Math.sin(-z*32),z);
+  const verts=[],idx=[];
+  for(const [scale,z] of rings){
+   // The crown broadens behind the toe and tapers away from the shaft at the heel.
+   const toeOffset=.013*(z/.09)**2;
+   for(const [x,y] of profile)verts.push(x*scale-toeOffset,y*scale+.005*Math.sin(-z*32),z);
+  }
   for(let r=0;r<rings.length-1;r++)for(let i=0;i<profile.length;i++){
    const a=r*profile.length+i,b=r*profile.length+(i+1)%profile.length;
    idx.push(a,b,a+profile.length,b,b+profile.length,a+profile.length);
@@ -77,7 +82,7 @@ export function clubModel(id){
 // Socket centers lie inside the heel casting so the shaft enters the head directly.
 export function heelSocket(id){
  const size=id==='wood'?.84:id==='hybrid'?.72:1;
- if(['driver','wood','hybrid'].includes(id))return new T.Vector3(-.038*size,.003*size,-.022*size);
+ if(['driver','wood','hybrid'].includes(id))return new T.Vector3(.055*size,.006*(id==='driver'?1:size*.88),-.010*size);
  return id==='putter'?new T.Vector3(-.041,.002,-.013):new T.Vector3(-.039,0,-.004);
 }
 export function makeShaft(){

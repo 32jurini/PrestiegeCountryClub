@@ -1,4 +1,4 @@
-import {clubModel,heelSocket} from './club-model.js?v=shaftline';
+import {clubModel,heelSocket} from './club-model.js?v=heelcorner';
 import * as T from 'three';
 
 // A divided cart bag, with the tallest clubs in the rear row.
