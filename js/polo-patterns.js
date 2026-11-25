@@ -10,7 +10,44 @@ export function poloTile(pattern){
   for(const p of points.slice(1))ctx.lineTo(...p);
   ctx.stroke();
  }
+ function shape(points){
+  ctx.beginPath();ctx.moveTo(...points[0]);
+  for(const p of points.slice(1))ctx.lineTo(...p);
+  ctx.closePath();ctx.fill();
+ }
  switch(pattern){
+  case 'chevron':
+   for(const y of [-12,36,84])line([[0,y],[48,y+24],[96,y]],8);
+   break;
+  case 'wave':
+   for(const y of [24,72]){
+    ctx.beginPath();ctx.moveTo(0,y);ctx.bezierCurveTo(16,y-22,32,y-22,48,y);
+    ctx.bezierCurveTo(64,y+22,80,y+22,96,y);ctx.lineWidth=6;ctx.stroke();
+   }break;
+  case 'gingham':
+   ctx.globalAlpha=.48;ctx.fillRect(0,0,48,96);ctx.fillRect(0,0,96,48);ctx.globalAlpha=1;break;
+  case 'cross':
+   for(const [x,y] of [[24,24],[72,72]]){
+    line([[x-9,y-9],[x+9,y+9]],5);line([[x-9,y+9],[x+9,y-9]],5);
+   }break;
+  case 'scallop':
+   for(const [x,y] of [[0,24],[96,24],[48,72],[0,120],[96,120]]){
+    for(const radius of [24,45]){
+     ctx.beginPath();ctx.arc(x,y,radius,Math.PI,2*Math.PI);ctx.lineWidth=4;ctx.stroke();
+    }
+   }break;
+  case 'spruce':
+   for(const [x,y] of [[24,22],[72,70]]){
+    shape([[x,y-18],[x+10,y-1],[x+5,y-1],[x+14,y+12],[x-14,y+12],[x-5,y-1],[x-10,y-1]]);
+    ctx.fillRect(x-2,y+10,4,8);
+   }break;
+  case 'bolt':
+   for(const [x,y] of [[24,24],[72,72]])shape([[x+7,y-19],[x-12,y+3],[x-2,y+3],[x-7,y+19],[x+13,y-5],[x+3,y-5]]);
+   break;
+  case 'flag':
+   for(const [x,y] of [[18,24],[66,72]]){
+    ctx.fillRect(x,y-14,3,29);shape([[x+2,y-14],[x+22,y-9],[x+2,y-3]]);
+   }break;
   case 'pinstripe':ctx.fillRect(0,47,96,4);break;
   case 'breton':ctx.fillRect(0,20,96,18);ctx.fillRect(0,52,96,4);break;
   case 'twin':ctx.fillRect(0,36,96,5);ctx.fillRect(0,48,96,5);break;
