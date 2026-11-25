@@ -1,4 +1,4 @@
-import {clubModel} from './club-model.js?v=forge';
+import {clubModel,heelSocket} from './club-model.js?v=shaftline';
 import * as T from 'three';
 
 // A divided cart bag, with the tallest clubs in the rear row.
@@ -34,8 +34,7 @@ export function buildBag(){
   const head=clubModel(id);bag.add(head);
   head.scale.setScalar(.81);head.position.set(x+.028,top,z);
   head.rotation.set(Math.PI-.35,wood?.18:row%2===0?-.34:.38,-.12);
-  const size=id==='wood'?.84:id==='hybrid'?.72:1;
-  const neck=new T.Vector3(-.046*size,.05*size,-.008*size).multiplyScalar(.81).applyQuaternion(head.quaternion).add(head.position);
+  const neck=heelSocket(id).multiplyScalar(.81).applyQuaternion(head.quaternion).add(head.position);
   const foot=new T.Vector3(x,.825,z),axis=neck.clone().sub(foot);
   shaft.scale.y=axis.length()/(top-.84);shaft.position.copy(foot).lerp(neck,.5);
   shaft.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),axis.normalize());

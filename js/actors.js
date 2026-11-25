@@ -1,4 +1,4 @@
-import {clubModel,makeShaft} from './club-model.js?v=forge';
+import {clubModel,makeShaft,heelSocket} from './club-model.js?v=shaftline';
 import {loadFittedModel,fitToRig,tintGolfer} from './tour-golfer.js?v=canopy';
 import {measureShot,contactTime} from './shot-pose.js?v=approach2';
 import * as THREE from 'three';
@@ -37,17 +37,23 @@ export class Golfer{
   this.club=new THREE.Group();
   this.clubHead=new THREE.Group();this.clubHead.position.y=-1;
   this.club.add(makeShaft(),this.clubHead);this.root.add(this.club);
+  this.shaftAxis=new THREE.Vector3(0,-1,0);this.shaftEnd=new THREE.Vector3();
   this.gripPose=new THREE.Quaternion();this.gripLength=1;this.setClub('driver');
  }
  setClub(type){
-  if(this.clubType===type)return;this.clubType=type;
+  if(this.clubType===type)return;this.clubType=type;this.socket=heelSocket(type);
   this.clubHead.clear();const model=clubModel(type);
   const bounds=new THREE.Box3();
   // Measure before applying the world rig transform.
   model.updateMatrixWorld(true);bounds.setFromObject(model,true);this.clubHead.add(model);
-  this.soleCorners=[];
+  this.fitShaft();this.soleCorners=[];
   for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])
    for(const z of [bounds.min.z,bounds.max.z])this.soleCorners.push(new THREE.Vector3(x,y,z));
+ }
+ fitShaft(){
+  const end=this.shaftEnd.copy(this.socket).applyQuaternion(this.clubHead.quaternion).add(this.clubHead.position);
+  const shaft=this.club.children[0];shaft.scale.set(1,end.length(),1);
+  shaft.quaternion.setFromUnitVectors(this.shaftAxis,end.normalize());
  }
  settleClub(address=false){
   if(!this.club.visible||!this.stanceGround||!this.ballTarget||!this.actions.has(this.mode)||!['drive','chip','putt'].includes(this.mode))return;
@@ -55,7 +61,7 @@ export class Golfer{
   this.club.quaternion.copy(this.gripPose);this.club.scale.setScalar(this.gripLength);
   const head=this.clubHead,point=head.getWorldPosition(new THREE.Vector3());
   const floor=this.stanceGround(point.x,point.z);
-  if(!address&&point.y-floor>.22){head.quaternion.identity();this.club.children[0].quaternion.identity();this.club.children[0].scale.setScalar(1);return}
+  if(!address&&point.y-floor>.22){head.quaternion.identity();this.fitShaft();return}
   if(address)point.copy(this.ballTarget).addScaledVector(this.line,-.07);
   const place=()=>{
    const local=hand.worldToLocal(point.clone());
@@ -71,11 +77,7 @@ export class Golfer{
    correction=Math.max(correction,this.stanceGround(vertex.x,vertex.z)+.002-vertex.y);
   }
   if(correction>0){point.y+=correction+.001;place()}
-  // Keep the grip fixed at the hand and the shaft connected to the rotating hosel.
-  const factor=this.clubType==='wood'?.84:this.clubType==='hybrid'?.72:1;
-  const end=new THREE.Vector3(-.046*factor,.050*factor,-.008*factor).applyQuaternion(head.quaternion).add(head.position);
-  const shaft=this.club.children[0],rest=new THREE.Vector3(-.046,-.95,-.008);
-  shaft.scale.setScalar(end.length()/rest.length());shaft.quaternion.setFromUnitVectors(rest.normalize(),end.normalize());
+  this.fitShaft();
  }
  groundShoes() {
   if(!this.soles||!this.stanceGround)return;
@@ -91,7 +93,7 @@ export class Golfer{
  }
  alignShot(name, ball, direction, floor, ground=null) {
   this.ballTarget=ball.clone();this.line=direction.clone();this.faceRotation=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),Math.atan2(direction.x,direction.z));
-  this.clubHead.quaternion.identity();this.stanceGround=ground;
+  this.clubHead.quaternion.identity();this.fitShaft();this.stanceGround=ground;
   this.model.position.y=this.restHeight;
   if(!this.poses.has(name)) {
    const pose=measureShot(this,name,THREE);

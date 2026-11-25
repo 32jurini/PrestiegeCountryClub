@@ -52,7 +52,6 @@ export function clubModel(id){
   const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(verts,3));g.setIndex(idx);g.computeVertexNormals();
   carbon.side=T.DoubleSide;head.add(new T.Mesh(g,carbon));
   plate(head,profile,.002,face);stripes(head,5,-.037,.041,-.014,.006,.004,sole);
-  pin(head,[-.045,.006,-.018],[-.046,.050,-.008],.011,.007,nickel);
   const size=id==='driver'?1:id==='wood'?.84:.72;head.scale.set(size,id==='driver'?1:size*.88,size);
  }else if(putt){
   plate(head,[[-.057,-.014],[.056,-.014],[.057,.010],[.049,.016],[-.051,.016]],.025,nickel,-.023);
@@ -62,7 +61,6 @@ export function clubModel(id){
   }
   plate(head,[[-.04,-.010],[.04,-.010],[.04,.010],[-.04,.010]],.0015,insert,.004);
   const mark=new T.Mesh(new T.BoxGeometry(.003,.001,.022),paint);mark.position.set(0,.018,-.012);head.add(mark);
-  pin(head,[-.042,.005,-.014],[-.046,.050,-.008],.007,.005,nickel);
  }else{
   const wedge=!id.startsWith('iron'),n=Number(id.slice(4))||7;
   const toe=wedge?.039:.023+(n-3)*.0014;
@@ -72,18 +70,23 @@ export function clubModel(id){
   stripes(blade,6,-.030,.042,-.014,.0044,wedge?.006:.002,sole);
   plate(blade,[[-.035,-.012],[.041,-.012],[.045,.011],[.028,.014],[-.03,.003]],.002,insert,-.0135);
   plate(blade,[[-.038,-.016],[.046,-.015],[.044,-.008],[.019,-.005],[-.036,-.010]],.004,nickel,-.019);
-  pin(head,[-.045,.001,-.004],[-.046,.050,-.008],.009,.0065,nickel);
  }
  const group=new T.Group();group.add(head);
  group.traverse(o=>{if(o.isMesh)o.castShadow=true});templates.set(id,group);return group.clone();
 }
+// Socket centers lie inside the heel casting so the shaft enters the head directly.
+export function heelSocket(id){
+ const size=id==='wood'?.84:id==='hybrid'?.72:1;
+ if(['driver','wood','hybrid'].includes(id))return new T.Vector3(-.038*size,.003*size,-.022*size);
+ return id==='putter'?new T.Vector3(-.041,.002,-.013):new T.Vector3(-.039,0,-.004);
+}
 export function makeShaft(){
  const shaft=new T.Group();
- pin(shaft,[0,0,0],[-.046,-.95,-.008],.008,.0058,nickel);
- pin(shaft,[0,.027,0],[-.011,-.215,-.002],.015,.011,insert);
+ pin(shaft,[0,0,0],[0,-1,0],.008,.0058,nickel);
+ pin(shaft,[0,.027,0],[0,-.215,0],.015,.011,insert);
  for(let i=0;i<7;i++){
   const k=i/7,y=.012-.20*k;
-  pin(shaft,[-.046*(-y),y,0],[-.046*(-y),y-.002,0],.0145-.003*k,.0145-.003*k,sole);
+  pin(shaft,[0,y,0],[0,y-.002,0],.0145-.003*k,.0145-.003*k,sole);
  }
  return shaft;
 }

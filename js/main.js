@@ -1,7 +1,7 @@
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
-import {lightClubs} from './club-model.js?v=forge';
+import {lightClubs} from './club-model.js?v=shaftline';
 import * as THREE from 'three';
-import {GolfGame} from './game.js?v=forge';
+import {GolfGame} from './game.js?v=shaftline';
 import {SoundEngine} from './sound.js';
 import {OnlineRoom} from './online.js?v=friends1';
 import {FriendsService,isOnline} from './friends.js?v=friends1';
