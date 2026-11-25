@@ -1,5 +1,6 @@
+import {landscape,fairwayCollar,sandFinish,cartPath} from './course-landscape.js';
 import {TreeContact} from './tree-contact.js';
-import {plantTrees,horizon,detailSurface,frameHole,cutBunkers} from './course-detail.js?v=canopy';
+import {plantTrees,horizon,detailSurface,frameHole,cutBunkers} from './course-detail.js?v=clubcraft';
 import {extendCourses} from './full-round.js';
 import * as THREE from 'three';
 export const COURSES={royal:{name:'THE ROYAL CLASSIC',type:'parkland',sky:0x93bed0,fog:0xb4c5a7,grass:0x507849,rough:0x3e6140,fairway:0x7aa65e,trees:0x254b2b,wind:3,holes:[
@@ -55,7 +56,11 @@ export class World{
   // A continuous valley floor joins the playable shelves to the surrounding ridges.
   const ridge=this.current==='misty'?THREE.MathUtils.smoothstep(edge,4,108)*
    (38+17*Math.sin(z*.024+x*.019)+11*Math.cos(x*.051-z*.013)):0;
-  return ridge+hills-sandDepth+ this.station(z,3)+.5*Math.sin(x*.053)*Math.sin(z*.025)+.26*Math.sin(z*.049+x*.017)}
+  const phase=this.holeIndex*1.71,shoulder=THREE.MathUtils.smoothstep(edge,5,51);
+  let landform=0;
+  if(this.current==='summit')landform=shoulder*(8+4.8*Math.sin(.031*z+.023*x+phase)+3.6*Math.cos(.034*x-phase));
+  if(this.current==='ocean'&&x<28)landform=shoulder*(1.3+1.1*Math.cos(x*.21-z*.065+phase));
+  return landform+ridge+hills-sandDepth+ this.station(z,3)+.5*Math.sin(x*.053)*Math.sin(z*.025)+.26*Math.sin(z*.049+x*.017)}
  getGreenZ(){return 70-this.length}
  fairwayX(z){return this.station(z,1)}
  greenEdge(a){return 1+.06*Math.sin(2*a+.5)+.085*Math.cos(3*a-.4)}
@@ -124,6 +129,10 @@ export class World{
   }
  }
  const fg=new THREE.BufferGeometry();fg.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));fg.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));fg.setIndex(indices);fg.computeVertexNormals();this.mesh(fg,fair);
+ if(name!=='range'){
+  const collar=this.mat(name==='ocean'?0x75917a:0x6c8859);collar.map=this.grassTexture;detailSurface(collar);cutBunkers(collar,h.sand);
+  fairwayCollar(this,collar);sandFinish(sand);
+ }
  this.surfaceEllipse(0,70,8,6,teeMat,.05);
  this.green={x:this.holePosition.x,z:this.holePosition.z,rx:h.green[0],rz:h.green[1]};
  this.surfaceEllipse(this.green.x,this.green.z,h.green[0]+1.25,h.green[1]+1.25,fringe,.046,'green');
@@ -143,18 +152,10 @@ export class World{
   for(let i=0;i<v.count;i++){const x=v.getX(i)+207,z=v.getZ(i);v.setXYZ(i,x,this.groundHeight(x,z)+.08,z)}
   sea.geometry.computeVertexNormals();sea.castShadow=false;
  }
- const trees=[];const treeCount=name==='ocean'?65:name==='summit'?320:name==='royal'?265:145;for(let i=0;i<treeCount;i++){let z=90-rand(i+44)*this.length*1.65;let x=(rand(i+500)*2-1)*190;if(Math.abs(x-this.fairwayX(z))<(name==='range'?55:27))continue;if(name==='ocean'&&x>35)continue;trees.push([x,z,8+rand(i+734)*9,rand(i+18)]);}
- for(let i=0;i<28;i++){const x=(rand(i+123)*2-1)*240,z=-rand(i+421)*350;if(Math.abs(x-this.fairwayX(z))<(name==='range'?55:35))continue;if(name!=='ocean'||x<32)trees.push([x,z,7+rand(i+90)*6,rand(i+37)])}
- if(name==='royal'||name==='summit'){
-  for(let i=0;i<(name==='royal'?48:84);i++){
-   const seed=i+idx*143,z=78-rand(seed+765)*(this.length+22);
-   const setback=this.station(z,2)+12+rand(seed+819)*17;
-   const x=this.fairwayX(z)+(i%2?1:-1)*setback;
-   if(this.lie(x,z)==='ROUGH')trees.push([x,z,8+rand(seed+376)*8,rand(seed+614)]);
-  }
- }
+ if(name!=='range')cartPath(this);
+ const planting=landscape(this);
  this.flag=new THREE.Group();const pole=this.mesh(new THREE.CylinderGeometry(.035,.045,5,8),this.mat(0xf1f1df),this.flag);pole.position.y=2.5;const cloth=this.mesh(new THREE.BufferGeometry(),this.mat(name==='ocean'?0xf4b768:0xd5a861),this.flag);const flagVertices=new Float32Array([0,4.85,0,2,4.38,0,0,4.05,0]);cloth.geometry.setAttribute('position',new THREE.BufferAttribute(flagVertices,3));cloth.geometry.computeVertexNormals();cloth.material.side=THREE.DoubleSide;cloth.castShadow=false;this.flag.position.copy(this.holePosition);this.root.add(this.flag);
- plantTrees(this,trees,name==='summit'||name==='misty'?'pine':name==='royal'?'oak':'cypress');
+ plantTrees(this,planting.trees,planting.species);
  if(name==='range')this.rangeTargets();else frameHole(this);
  horizon(this);
  for(const x of [-2.2,2.2]){

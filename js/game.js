@@ -1,9 +1,9 @@
-import {buildBag} from './golf-bag.js?v=lift';
+import {buildBag} from './golf-bag.js?v=clubcraft';
 import {contactTime} from './shot-pose.js?v=approach2';
 import {CLUB_IRONS,curveAcceleration} from './irons.js?v=irons1';
 import * as THREE from 'three';
-import {World,COURSES} from './world.js?v=canopy';
-import {Golfer} from './actors.js?v=bagwalk';
+import {World,COURSES} from './world.js?v=clubcraft';
+import {Golfer} from './actors.js?v=clubcraft';
 const clamp=THREE.MathUtils.clamp,$=id=>document.getElementById(id);
 const SHAPES=['HOOK','DRAW','STRAIGHT','FADE','SLICE'];
 const BAG_TAGS={driver:'Driver',wood:'3W',hybrid:'4H',pitching:'PW',approach:'AW',wedge:'SW',lob:'LW',putter:'Putter'};
@@ -182,10 +182,10 @@ export class GolfGame{
   const rect=this.renderer.domElement.getBoundingClientRect();
   const pointer=new THREE.Vector2((event.clientX-rect.left)/rect.width*2-1,1-(event.clientY-rect.top)/rect.height*2);
   const ray=new THREE.Raycaster();ray.setFromCamera(pointer,this.camera);
-  const hits=ray.intersectObjects(this.bagHeads.flatMap(h=>[h,h.userData.shaft]),false);
+  const hits=ray.intersectObjects(this.bagHeads.flatMap(h=>[h,h.userData.shaft]),true);
   if(hits.length){
    const item=hits[0].object;
-   return this.bagHeads.find(h=>h===item||h.userData.shaft===item).userData.club;
+   return this.bagHeads.find(h=>h===item||h.getObjectById(item.id)||h.userData.shaft===item).userData.club;
   }
   // Keep the original head position selectable while it lifts away from the pointer.
   if(this.hoverClub){
@@ -193,7 +193,7 @@ export class GolfGame{
    const lift=head.position.y-head.userData.restY;
    // Test the resting silhouette too, including clicks near the edge of the head.
    ray.ray.origin.y+=lift;
-   if(ray.intersectObjects([head,head.userData.shaft],false).length)return this.hoverClub;
+   if(ray.intersectObjects([head,head.userData.shaft],true).length)return this.hoverClub;
   }
   return null;
  }

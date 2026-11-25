@@ -1,3 +1,4 @@
+import {clubModel,makeShaft} from './club-model.js';
 import {loadFittedModel,fitToRig,tintGolfer} from './tour-golfer.js?v=canopy';
 import {measureShot,contactTime} from './shot-pose.js?v=approach2';
 import * as THREE from 'three';
@@ -34,47 +35,47 @@ export class Golfer{
  constructor(scene){this.root=new THREE.Group();scene.add(this.root);this.model=null;this.mixer=null;this.actions=new Map();this.mode='idle';this.club=null;this.humanSource='';this.nativeClips=[];this.appearance={};this.proceduralTime=0;this.proceduralName='idle';this.basePose=new Map();this.loadVersion=0;this.updateHandClub()}
  updateHandClub() {
   this.club=new THREE.Group();
-  const metal=new THREE.MeshStandardMaterial({color:0xc1cbcb,metalness:.72,roughness:.25});
-  const shaft=new THREE.Mesh(new THREE.CylinderGeometry(.009,.012,.95,12),metal);
-  shaft.position.y=-.5;
-  const grip=new THREE.Mesh(new THREE.CylinderGeometry(.019,.015,.24,16),new THREE.MeshStandardMaterial({color:0x25322f}));
-  grip.position.y=-.10;
-  this.clubHead=new THREE.Mesh(new THREE.SphereGeometry(1,18,12),metal.clone());this.driverGeometry=this.clubHead.geometry;
-  // Cast blade with a rounded toe and a lower heel at the hosel.
-  const blade=new THREE.Shape();
-  blade.moveTo(-.052,-.016);blade.quadraticCurveTo(-.06,-.023,-.041,-.023);
-  blade.lineTo(.049,-.020);blade.quadraticCurveTo(.065,-.017,.062,.004);
-  blade.quadraticCurveTo(.06,.032,.044,.031);blade.lineTo(-.041,.012);
-  blade.quadraticCurveTo(-.055,.008,-.052,-.016);
-  this.ironGeometry=new THREE.ExtrudeGeometry(blade,{depth:.012,bevelEnabled:true,bevelSegments:3,steps:1,bevelSize:.002,bevelThickness:.002});
-  this.bladeDetail=new THREE.Group();this.clubHead.add(this.bladeDetail);
-  const grooves=[];
-  for(let row=0;row<6;row++){
-   const y=-.014+row*.005;grooves.push(-.036,y,.0142,.047,y,.0142);
-  }
-  const lines=new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(grooves,3));
-  this.bladeDetail.add(new THREE.LineSegments(lines,new THREE.LineBasicMaterial({color:0x677478})));
-  const heel=new THREE.Vector3(-.046,-.996,.002),join=new THREE.Vector3(0,-.954,0);
-  const neck=new THREE.Mesh(new THREE.CylinderGeometry(.006,.009,heel.distanceTo(join),12),metal);
-  neck.position.copy(heel).lerp(join,.5);neck.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),join.clone().sub(heel).normalize());
-  this.hosel=neck;this.club.add(neck);this.bladeDetail.visible=neck.visible=false;
-  this.clubHead.scale.set(.09,.045,.07);
-  this.clubHead.position.y=-1;
-  this.club.add(shaft,grip,this.clubHead);
-  this.root.add(this.club);
+  this.clubHead=new THREE.Group();this.clubHead.position.y=-1;
+  this.club.add(makeShaft(),this.clubHead);this.root.add(this.club);
+  this.gripPose=new THREE.Quaternion();this.gripLength=1;this.setClub('driver');
  }
- setClub(type) {
-  const iron=/^iron[3-9]$/.test(type);
-  const wedge=['pitching','approach','wedge','lob'].includes(type);
-  const blade=iron||wedge;
-  this.clubHead.geometry=blade?this.ironGeometry:this.driverGeometry;
-  this.bladeDetail.visible=this.hosel.visible=blade;
-  this.clubHead.rotation.set(blade?-(iron?.23+.045*(Number(type.slice(-1))-3):.71):0,0,0);
-  if(blade)this.clubHead.scale.setScalar(1);
-  else if(type==='putter')this.clubHead.scale.set(.065,.018,.028);
-  else this.clubHead.scale.setScalar(type==='hybrid'?.64:type==='wood'?.77:1).multiply(new THREE.Vector3(.095,.044,.075));
-  this.clubHead.material.color.set(blade?0xc8d2d6:type==='putter'?0x697b83:0x687781);
-  this.clubHead.material.metalness=blade?.72:.58;this.clubHead.material.roughness=blade?.29:.31;
+ setClub(type){
+  if(this.clubType===type)return;this.clubType=type;
+  this.clubHead.clear();const model=clubModel(type);
+  const bounds=new THREE.Box3();
+  // Measure before applying the world rig transform.
+  model.updateMatrixWorld(true);bounds.setFromObject(model,true);this.clubHead.add(model);
+  this.soleCorners=[];
+  for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])
+   for(const z of [bounds.min.z,bounds.max.z])this.soleCorners.push(new THREE.Vector3(x,y,z));
+ }
+ settleClub(address=false){
+  if(!this.club.visible||!this.stanceGround||!this.ballTarget||!this.actions.has(this.mode)||!['drive','chip','putt'].includes(this.mode))return;
+  const hand=this.club.parent;
+  this.club.quaternion.copy(this.gripPose);this.club.scale.setScalar(this.gripLength);
+  const head=this.clubHead,point=head.getWorldPosition(new THREE.Vector3());
+  const floor=this.stanceGround(point.x,point.z);
+  if(!address&&point.y-floor>.22){head.quaternion.identity();this.club.children[0].quaternion.identity();this.club.children[0].scale.setScalar(1);return}
+  if(address)point.copy(this.ballTarget).addScaledVector(this.line,-.07);
+  const place=()=>{
+   const local=hand.worldToLocal(point.clone());
+   this.club.scale.setScalar(local.length());this.club.quaternion.setFromUnitVectors(new THREE.Vector3(0,-1,0),local.normalize());
+   head.quaternion.copy(this.club.getWorldQuaternion(new THREE.Quaternion()).invert()).multiply(this.faceRotation);
+   head.updateWorldMatrix(true,false);
+  };
+  place();
+  let correction=0;
+  const vertex=new THREE.Vector3();
+  for(const corner of this.soleCorners){
+   vertex.copy(corner).applyMatrix4(head.matrixWorld);
+   correction=Math.max(correction,this.stanceGround(vertex.x,vertex.z)+.002-vertex.y);
+  }
+  if(correction>0){point.y+=correction+.001;place()}
+  // Keep the grip fixed at the hand and the shaft connected to the rotating hosel.
+  const factor=this.clubType==='wood'?.84:this.clubType==='hybrid'?.72:1;
+  const end=new THREE.Vector3(-.046*factor,.050*factor,-.008*factor).applyQuaternion(head.quaternion).add(head.position);
+  const shaft=this.club.children[0],rest=new THREE.Vector3(-.046,-.95,-.008);
+  shaft.scale.setScalar(end.length()/rest.length());shaft.quaternion.setFromUnitVectors(rest.normalize(),end.normalize());
  }
  groundShoes() {
   if(!this.soles||!this.stanceGround)return;
@@ -89,7 +90,8 @@ export class Golfer{
   if(Number.isFinite(gap))this.model.position.y-=gap;
  }
  alignShot(name, ball, direction, floor, ground=null) {
-  this.stanceGround=ground;
+  this.ballTarget=ball.clone();this.line=direction.clone();this.faceRotation=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),Math.atan2(direction.x,direction.z));
+  this.clubHead.quaternion.identity();this.stanceGround=ground;
   this.model.position.y=this.restHeight;
   if(!this.poses.has(name)) {
    const pose=measureShot(this,name,THREE);
@@ -112,6 +114,7 @@ export class Golfer{
    this.club.quaternion.setFromUnitVectors(new THREE.Vector3(0,-1,0),target.clone().normalize());
    this.club.scale.setScalar(target.length());action.stop();
   }
+  this.gripPose.copy(this.club.quaternion);this.gripLength=this.club.scale.x;
  }
  address(name) {
   this.endAt=0;
@@ -121,7 +124,7 @@ export class Golfer{
   this.mixer.stopAllAction();
   action.reset().play();action.paused=true;
   this.mixer.update(0);
-  this.mode=name;this.proceduralName='none';this.groundShoes();
+  this.mode=name;this.proceduralName='none';this.groundShoes();this.settleClub(true);
  }
  async loadLocal(url) {
   const coach = url.endsWith('/Timmy.fbx');
@@ -136,7 +139,7 @@ export class Golfer{
   const unit=hand.getWorldScale(new THREE.Vector3()).x||1;
   this.clubBaseScale=1/unit;
   this.club.scale.setScalar(this.clubBaseScale);
-  this.club.children[0].position.y=-.48;
+
   this.clubHead.position.y=-1;
  }
  this.restHeight=model.position.y;this.toes=[...this.basePose.keys()].filter(b=>/ToeBase$/.test(b.name));this.humanSource=source;this.animate('idle',true);this.applyAppearance(this.appearance);return source}
@@ -190,6 +193,7 @@ export class Golfer{
    const height=Math.min(...this.toes.map(toe=>this.root.worldToLocal(toe.getWorldPosition(position)).y));
    this.model.position.y+=.04-height;
   }
+  this.settleClub(action?.paused===true);
   if(this.endAt && action && action.time>=this.endAt-.0001){
    this.endAt=0;
    if(this.onShotEnd)this.onShotEnd();else this.animate('idle',true);

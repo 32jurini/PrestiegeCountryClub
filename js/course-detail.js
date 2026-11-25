@@ -111,16 +111,7 @@ export function frameHole(world) {
   const tint=.61+.38*noise(i+62);mesh.setColorAt(i,color.setRGB(tint,tint,tint*.93));
  }
  mesh.castShadow=ocean;mesh.receiveShadow=true;world.root.add(mesh);
- // A second stand just outside the dogleg frames the downhill target.
- if(summits){
-  const stand=[];
-  for(let i=0;i<38;i++){
-   const z=70-(.4+noise(i+21)*.72)*world.length;
-   const x=world.fairwayX(z)+(i%2?-1:1)*(world.station(z,2)+10+noise(i+43)*18);
-   stand.push([x,z,7+noise(i+9)*10,noise(i+77)]);
-  }
-  plantTrees(world,stand,'pine');
- }
+
 }
 
 // Cut the turf out of the bunker footprint even where neighboring terrain triangles span the lip.

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {GolfGame} from './game.js?v=lift';
+import {GolfGame} from './game.js?v=clubcraft';
 import {SoundEngine} from './sound.js';
 import {OnlineRoom} from './online.js?v=friends1';
 import {FriendsService,isOnline} from './friends.js?v=friends1';

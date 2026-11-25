@@ -1,3 +1,4 @@
+import {clubModel} from './club-model.js';
 import * as T from 'three';
 
 // A divided cart bag, with the tallest clubs in the rear row.
@@ -30,9 +31,15 @@ export function buildBag(){
   const wood=i<3,top=1.22-row*.081+(col%2)*.009+(wood?.08:0);
   const shaft=mesh(new T.CylinderGeometry(.004,.005,top-.84,8),steel,x,(top+.84)/2,z);
   shaft.rotation.z=-x*.34;
-  const head=mesh(new T.SphereGeometry(1,16,10),wood?leather:steel,x+x*.11,top,z);
-  head.scale.set(wood?.051:.039,wood?.031:.019,wood?.038:.012);
-  head.rotation.z=wood?-.18:.34;head.userData.club=id;head.userData.shaft=shaft;head.userData.restY=top;head.userData.shaftY=shaft.position.y;heads.push(head);
+  const head=clubModel(id);bag.add(head);
+  head.scale.setScalar(.81);head.position.set(x+.028,top,z);
+  head.rotation.set(Math.PI-.35,0,-.12);
+  const size=id==='wood'?.84:id==='hybrid'?.72:1;
+  const neck=new T.Vector3(-.046*size,.05*size,-.008*size).multiplyScalar(.81).applyQuaternion(head.quaternion).add(head.position);
+  const foot=new T.Vector3(x,.825,z),axis=neck.clone().sub(foot);
+  shaft.scale.y=axis.length()/(top-.84);shaft.position.copy(foot).lerp(neck,.5);
+  shaft.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),axis.normalize());
+  head.userData.club=id;head.userData.shaft=shaft;head.userData.restY=top;head.userData.shaftY=shaft.position.y;heads.push(head);
  });
  bag.visible=false;return {bag,heads};
 }
