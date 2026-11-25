@@ -1,4 +1,4 @@
-import {waterMaterial,coastalBank,shoreX} from './water.js';
+import {waterMaterial,coastalBank,shoreX} from './water.js?v=coast2';
 import {landscape,fairwayCollar,sandFinish,cartPath} from './course-landscape.js';
 import {TreeContact} from './tree-contact.js';
 import {plantTrees,horizon,detailSurface,frameHole,cutBunkers} from './course-detail.js?v=clubcraft';

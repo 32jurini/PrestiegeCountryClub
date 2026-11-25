@@ -1,10 +1,10 @@
-import {WaterSplash} from './water.js';
+import {WaterSplash} from './water.js?v=coast2';
 import {WEDGES,wedgeLaunch} from './wedges.js';
 import {buildBag} from './golf-bag.js?v=wedges1';
 import {contactTime} from './shot-pose.js?v=approach2';
 import {CLUB_IRONS,curveAcceleration} from './irons.js?v=irons1';
 import * as THREE from 'three';
-import {World,COURSES} from './world.js?v=coast1';
+import {World,COURSES} from './world.js?v=coast2';
 import {Golfer} from './actors.js?v=coast1';
 const clamp=THREE.MathUtils.clamp,$=id=>document.getElementById(id);
 const SHAPES=['HOOK','DRAW','STRAIGHT','FADE','SLICE'];
