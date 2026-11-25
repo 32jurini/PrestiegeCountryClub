@@ -13,7 +13,12 @@ export const catalog=[
 export const itemById=id=>catalog.find(item=>item.id===id);
 export function wallet(){
  const raw=localStorage.getItem(walletKey);
- return raw?JSON.parse(raw):{credits:0,owned:['custom','white'],equipped:{shirt:'custom',ball:'white'},rounds:{}};
+ const state=raw?JSON.parse(raw):{credits:0,owned:['custom','white'],equipped:{shirt:'custom',ball:'white'},rounds:{}};
+ for(const slot of ['shirt','ball']){
+  const choice=localStorage.getItem(walletKey+'-'+slot);
+  if(state.owned.includes(choice)&&itemById(choice)?.slot===slot)state.equipped[slot]=choice;
+ }
+ return state;
 }
 function update(change){
  const commit=()=>{
@@ -43,9 +48,8 @@ export function buy(id){
  });
 }
 export function wear(id){
- return update(state=>{
-  const item=itemById(id);
-  if(!item||!state.owned.includes(id))throw Error('Purchase this item first.');
-  state.equipped[item.slot]=id;
- });
+ const item=itemById(id);
+ if(!item||!wallet().owned.includes(id))throw Error('Purchase this item first.');
+ // A single-slot write commits before navigation and cannot overwrite a concurrent payout.
+ localStorage.setItem(walletKey+'-'+item.slot,id);
 }
