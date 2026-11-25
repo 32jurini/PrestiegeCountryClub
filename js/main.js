@@ -1,10 +1,11 @@
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
-import {lightClubs} from './club-model.js?v=heelcorner';
+import {lightClubs} from './club-model.js?v=locker1';
 import * as THREE from 'three';
-import {GolfGame} from './game.js?v=heelcorner';
+import {GolfGame} from './game.js?v=locker1';
 import {SoundEngine} from './sound.js';
 import {OnlineRoom} from './online.js?v=friends1';
 import {FriendsService,isOnline} from './friends.js?v=friends1';
+import {walletKey,wallet,catalog,itemById,award,buy,wear} from './locker.js';
 const $=id=>document.getElementById(id);
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(window.devicePixelRatio,1.6));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;$('viewport').appendChild(renderer.domElement);
 const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(54,innerWidth/innerHeight,.1,1100);const sun=new THREE.DirectionalLight(0xffe7c7,2.1);sun.position.set(-65,100,42);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-14;sun.shadow.camera.right=14;sun.shadow.camera.top=14;sun.shadow.camera.bottom=-14;sun.shadow.camera.near=.5;sun.shadow.camera.far=320;sun.shadow.normalBias=.009;sun.shadow.bias=-.00012;scene.add(sun.target);scene.add(sun);scene.add(new THREE.HemisphereLight(0xc3e8ff,0x55513e,1.25));
@@ -60,9 +61,64 @@ $('playing').addEventListener('click',event=>{
 document.querySelectorAll('[data-shape]').forEach(b=>b.onclick=()=>game.setShape(b.dataset.shape));
 const saved=(()=>{try{return JSON.parse(localStorage.getItem('prestiege-golfer'))||{}}catch{return {}}})();$('golferName').value=saved.name||'ROOKIE';$('golferFrame').value=saved.frame||'male';$('shirtColor').value=saved.shirt||'#e9f0e9';$('hairColor').value=saved.hair||'#36261f';$('eyeColor').value=saved.eyes||'#4c8069';$('skinColor').value=saved.skin||'#ba8c70';$('pantsColor').value=saved.pants||'#1d3535';
 const palette=()=>({shirt:$('shirtColor').value,pants:$('pantsColor').value,hair:$('hairColor').value,eyes:$('eyeColor').value,skin:$('skinColor').value});
-async function equip(){const frame=$('golferFrame').value;$('animationStatus').textContent='LOADING GOLF ANIMATIONS…';const source=await game.prepareGolfer(frame);game.golfer.applyAppearance(palette());$('modelSource').textContent=source.toUpperCase();const ready=['idle','drive','chip','putt','walk','run','tee','pick'].filter(name=>game.golfer.actions.has(name)).length;$('animationStatus').textContent=ready===8?`8/8 GOLF ANIMATIONS READY · ${game.golfer.actions.size}/19 CLIPS LOADED`:`${ready}/8 GOLF ANIMATIONS · BUILT-IN SWING BACKUP`;return source}
+function applyGear(){
+ const {equipped}=wallet(),shirt=itemById(equipped.shirt),ball=itemById(equipped.ball);
+ game.ball.material.color.set(ball.color);
+ game.golfer.applyAppearance({...palette(),shirt:shirt.color||$('shirtColor').value});
+ const fabric=game.golfer.outfit?.shirt;
+ if(!fabric||fabric.userData.finish===shirt.id)return;
+ fabric.userData.finish=shirt.id;
+ fabric.customProgramCacheKey=()=>shirt.stripe?shirt.id:'club-solid';
+ fabric.onBeforeCompile=shader=>{
+  if(!shirt.stripe)return;
+  shader.uniforms.thread={value:new THREE.Color(shirt.stripe)};
+  shader.vertexShader='varying float fabricHeight;\n'+shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\n fabricHeight=position.y;');
+  shader.fragmentShader='uniform vec3 thread; varying float fabricHeight;\n'+shader.fragmentShader.replace('#include <map_fragment>','#include <map_fragment>\n float band=abs(fract(fabricHeight*25.0)-0.5); float aa=max(fwidth(fabricHeight*25.0),0.006); diffuseColor.rgb=mix(diffuseColor.rgb,thread,0.8*(1.0-smoothstep(0.055-aa,0.055+aa,band)));');
+ };
+ fabric.needsUpdate=true;
+}
+function renderGear(){
+ const state=wallet();
+ $('creditBalance').textContent=state.credits+' CREDITS';
+ $('creditBalance').ariaLabel=state.credits+' credits. Open Store';
+ for(const view of ['locker','store']){
+  const list=$(view+'Items');list.replaceChildren();
+  for(const slot of ['shirt','ball']){
+   const heading=document.createElement('h3');heading.textContent=slot==='shirt'?'Polos':'Golf balls';list.append(heading);
+   for(const item of catalog.filter(i=>i.slot===slot)){
+    const owned=state.owned.includes(item.id),wearing=state.equipped[slot]===item.id;
+    if(view==='locker'?!owned:!item.price)continue;
+    const card=document.createElement('div'),swatch=document.createElement('i'),name=document.createElement('strong'),action=document.createElement('button');
+    card.className='gear-card';swatch.className='swatch '+slot;
+    swatch.style.setProperty('--gear',item.color||$('shirtColor').value);
+    if(item.stripe)swatch.style.setProperty('--pattern','repeating-linear-gradient(0deg,transparent 0 6px,'+item.stripe+' 6px 7px)');
+    name.textContent=item.name;action.className='glass';
+    action.textContent=view==='locker'?(wearing?'Equipped':'Equip'):(owned?'Owned':'Buy · '+item.price+' credits');
+    action.disabled=view==='locker'?wearing:owned||state.credits<item.price;
+    action.setAttribute('aria-label',action.textContent+' · '+item.name);
+    action.onclick=async()=>{try{
+     if(view==='locker')await wear(item.id);else await buy(item.id);
+     renderGear();applyGear();$(view+'Status').textContent=item.name+(view==='locker'?' equipped.':' is in your Locker.');
+    }catch(error){$(view+'Status').textContent=error.message}};
+    card.append(swatch,name,action);list.append(card);
+   }
+  }
+ }
+}
+game.onHoleComplete=async(round,hole,shots)=>{
+ const sameHole=()=>game.roundId===round&&game.index===hole&&game.modal;
+ try{
+  const credits=await award(round,hole,shots);
+  renderGear();
+  if(credits&&sameHole())$('roundDescription').append(' · +'+credits+' CREDITS');
+ }catch{if(sameHole())$('roundDescription').append(' · Credits could not be saved on this browser.')}
+};
+window.addEventListener('storage',e=>{if(e.key===walletKey){renderGear();applyGear()}});
+renderGear();
+
+async function equip(){const frame=$('golferFrame').value;$('animationStatus').textContent='LOADING GOLF ANIMATIONS…';const source=await game.prepareGolfer(frame);applyGear();$('modelSource').textContent=source.toUpperCase();const ready=['idle','drive','chip','putt','walk','run','tee','pick'].filter(name=>game.golfer.actions.has(name)).length;$('animationStatus').textContent=ready===8?`8/8 GOLF ANIMATIONS READY · ${game.golfer.actions.size}/19 CLIPS LOADED`:`${ready}/8 GOLF ANIMATIONS · BUILT-IN SWING BACKUP`;return source}
 $('saveGolfer').onclick=async()=>{const golfer={name:$('golferName').value.trim()||'ROOKIE',frame:$('golferFrame').value,...palette()};localStorage.setItem('prestiege-golfer',JSON.stringify(golfer));$('loader').classList.remove('hidden');try{await equip();$('loader').classList.add('hidden');showPage('home')}catch(e){$('loader').classList.add('hidden');$('error').textContent='Golfer could not load: '+e.message;$('error').classList.remove('hidden')}};
-['shirtColor','pantsColor','hairColor','eyeColor','skinColor'].forEach(id=>$(id).addEventListener('input',()=>game.golfer.applyAppearance(palette())));$('golferFrame').addEventListener('change',async()=>{$('golferFrame').disabled=true;$('loader').classList.remove('hidden');try{await equip()}catch(e){$('error').textContent='Golfer preview could not load: '+e.message;$('error').classList.remove('hidden')}finally{$('golferFrame').disabled=false;$('loader').classList.add('hidden')}});
+['shirtColor','pantsColor','hairColor','eyeColor','skinColor'].forEach(id=>$(id).addEventListener('input',()=>applyGear()));$('golferFrame').addEventListener('change',async()=>{$('golferFrame').disabled=true;$('loader').classList.remove('hidden');try{await equip()}catch(e){$('error').textContent='Golfer preview could not load: '+e.message;$('error').classList.remove('hidden')}finally{$('golferFrame').disabled=false;$('loader').classList.add('hidden')}});
 $('soundBtn').onclick=async()=>{const on=await sound.toggle();$('soundBtn').textContent=on?'SOUND ON':'SOUND OFF'};
 
 const onlinePanel=$('onlinePanel'),onlineStatus=$('onlineStatus'),onlineCode=$('onlineCode'),rivalStats=$('rivalStats');

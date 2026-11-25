@@ -36,6 +36,24 @@ function stripes(parent,rows,x0,x1,y0,dy,z,material){
   m.position.set((x0+x1)/2,y0+dy*i,z);parent.add(m);
  }
 }
+// Cut each stroke through a satin-metal badge. The dark cavity shows inside the numeral.
+function ironStamp(blade,number){
+ const badge=roundedOutline([[-.008,-.010],[.008,-.010],[.008,.010],[-.008,.010]]);
+ const segments=[
+  [0,-.007,true],[.004,-.0035,false],[.004,.0035,false],[0,.007,true],
+  [-.004,.0035,false],[-.004,-.0035,false],[0,0,true]
+ ];
+ const digits={3:'01623',4:'5612',5:'05623',6:'056423',7:'012',8:'0123456',9:'015623'};
+ for(const segment of digits[number]){
+  const [x,y,horizontal]=segments[segment];
+  const dx=horizontal?.0034:.00085,dy=horizontal?.00085:.00265;
+  const cut=new T.Path();cut.moveTo(x-dx,y-dy);cut.lineTo(x+dx,y-dy);
+  cut.lineTo(x+dx,y+dy);cut.lineTo(x-dx,y+dy);cut.closePath();badge.holes.push(cut);
+ }
+ const relief=new T.ExtrudeGeometry(badge,{depth:.0007,bevelEnabled:false});
+ const stamp=new T.Mesh(relief,nickel);stamp.name='Engraved '+number+' iron';
+ stamp.position.set(.024,.001,-.0163);blade.add(stamp);
+}
 export function clubModel(id){
  if(templates.has(id))return templates.get(id).clone();
  const head=new T.Group(),wood=['driver','wood','hybrid'].includes(id),putt=id==='putter';
@@ -75,6 +93,7 @@ export function clubModel(id){
   stripes(blade,6,-.030,.042,-.014,.0044,wedge?.006:.002,sole);
   plate(blade,[[-.035,-.012],[.041,-.012],[.045,.011],[.028,.014],[-.03,.003]],.002,insert,-.0135);
   plate(blade,[[-.038,-.016],[.046,-.015],[.044,-.008],[.019,-.005],[-.036,-.010]],.004,nickel,-.019);
+  if(!wedge)ironStamp(blade,n);
  }
  const group=new T.Group();group.add(head);
  group.traverse(o=>{if(o.isMesh)o.castShadow=true});templates.set(id,group);return group.clone();

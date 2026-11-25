@@ -1,9 +1,9 @@
-import {buildBag} from './golf-bag.js?v=heelcorner';
+import {buildBag} from './golf-bag.js?v=locker1';
 import {contactTime} from './shot-pose.js?v=approach2';
 import {CLUB_IRONS,curveAcceleration} from './irons.js?v=irons1';
 import * as THREE from 'three';
 import {World,COURSES} from './world.js?v=clubcraft';
-import {Golfer} from './actors.js?v=heelcorner';
+import {Golfer} from './actors.js?v=locker1';
 const clamp=THREE.MathUtils.clamp,$=id=>document.getElementById(id);
 const SHAPES=['HOOK','DRAW','STRAIGHT','FADE','SLICE'];
 const BAG_TAGS={driver:'Driver',wood:'3W',hybrid:'4H',pitching:'PW',approach:'AW',wedge:'SW',lob:'LW',putter:'Putter'};
@@ -94,7 +94,7 @@ export class GolfGame{
  }
  enterMenu(){this.clearBag();this.started=false;this.previewMode=false;this.shotPreview.group.visible=false;this.world.create('royal',0);this.ball.visible=false;this.golfer.setVisible(false);this.coachActor?.setVisible(false);this.camera.position.set(39,37,110);this.camera.lookAt(-4,3,-45)}
  enterPreview(){this.golfer.stanceGround=null;this.previewMode=true;this.golfer.club.visible=false;this.golfer.setVisible(true);this.golfer.root.position.set(0,this.world.ground(0,67),67);this.golfer.root.rotation.set(0,Math.PI,0);this.golfer.animate('idle',true)}
- async begin(course='royal',tutorial=false){await this.golferReady;this.tutorial=tutorial;this.course=course;this.scores=[];if(tutorial)await this.loadCoach();this.startHole(0);if(tutorial){this.coachActor?.setVisible(true);this.positionCoach()}}
+ async begin(course='royal',tutorial=false){await this.golferReady;this.tutorial=tutorial;this.course=course;this.roundId=crypto.randomUUID();this.scores=[];if(tutorial)await this.loadCoach();this.startHole(0);if(tutorial){this.coachActor?.setVisible(true);this.positionCoach()}}
  resetBallToTee() {
   this.position.copy(this.world.teePosition);
   this.position.y = this.world.ground(this.position.x, this.position.z) + BALL_RADIUS + .025;
@@ -289,7 +289,7 @@ export class GolfGame{
    return `<table><caption>${half?'Back nine':'Front nine'}</caption><thead><tr><th>Hole</th>${numbers}<th>Total</th></tr></thead><tbody><tr><th scope="row">Strokes</th>${strokes}<td>${sum}</td></tr></tbody></table>`;
   }).join('');
  }
- finishHole(){this.onSfx('cup');this.shotPreview.group.visible=false;this.swinging=false;this.charging=false;this.modal=true;this.scores.push(this.shots);const par=this.world.hole.par,d=this.shots-par;let title=d===-3?'ALBATROSS':d===-2?'EAGLE':d===-1?'BIRDIE':d===0?'PAR':d===1?'BOGEY':d===2?'DOUBLE BOGEY':`${d>0?'+':''}${d}`;if(this.shots===1)title='HOLE IN ONE';$('roundEyebrow').textContent='HOLE COMPLETE';$('roundTitle').textContent=title;$('roundDescription').textContent=`${this.shots} STROKES · PAR ${par} · ${COURSES[this.course].name}`;this.renderScorecard();$('nextHole').textContent=this.index===COURSES[this.course].holes.length-1?'VIEW FINAL SCORE →':'NEXT HOLE →';$('roundModal').classList.remove('hidden');if(d<0)this.golfer.shot('cheer')}
+ finishHole(){if(this.modal||!this.started||this.course==='range'||this.scores.length!==this.index||this.shots<1)return;this.onSfx('cup');this.shotPreview.group.visible=false;this.swinging=false;this.charging=false;this.modal=true;this.scores.push(this.shots);const par=this.world.hole.par,d=this.shots-par;let title=d===-3?'ALBATROSS':d===-2?'EAGLE':d===-1?'BIRDIE':d===0?'PAR':d===1?'BOGEY':d===2?'DOUBLE BOGEY':`${d>0?'+':''}${d}`;if(this.shots===1)title='HOLE IN ONE';$('roundEyebrow').textContent='HOLE COMPLETE';$('roundTitle').textContent=title;$('roundDescription').textContent=`${this.shots} STROKES · PAR ${par} · ${COURSES[this.course].name}`;this.onHoleComplete?.(this.roundId,this.index,this.shots);this.renderScorecard();$('nextHole').textContent=this.index===COURSES[this.course].holes.length-1?'VIEW FINAL SCORE →':'NEXT HOLE →';$('roundModal').classList.remove('hidden');if(d<0)this.golfer.shot('cheer')}
  next(){if(this.index+1<COURSES[this.course].holes.length){this.startHole(this.index+1);return}const total=this.scores.reduce((a,b)=>a+b,0),par=COURSES[this.course].holes.reduce((a,b)=>a+b.par,0),diff=total-par;$('roundEyebrow').textContent='ROUND COMPLETE';$('roundTitle').textContent=diff===0?'EVEN PAR':diff>0?`+${diff}`:String(diff);$('roundDescription').textContent=`${total} TOTAL STROKES · ${COURSES[this.course].name}`;this.renderScorecard();$('nextHole').textContent='PLAY AGAIN ↻';this.index=COURSES[this.course].holes.length;const key='prestiege-records';try{const records=JSON.parse(localStorage.getItem(key)||'[]');records.push({course:this.course,total,par,date:new Date().toISOString()});localStorage.setItem(key,JSON.stringify(records.slice(-50)))}catch{}}
  actionNext(){if(this.index===COURSES[this.course].holes.length){this.begin(this.course);return}this.next()}
  listeners(){window.addEventListener('keydown',e=>{if(!this.started||this.modal||e.target.matches('input,select'))return;if(['Space','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();if(e.code==='Space'&&!e.repeat)this.startCharge();if(e.code==='ArrowLeft'||e.code==='KeyA')this.aimDelta(-2);if(e.code==='ArrowRight'||e.code==='KeyD')this.aimDelta(2);if(e.code==='KeyC'&&!e.repeat)this.openBag();if(e.code==='Escape')this.returnFromBag(this.club);if(e.code==='KeyZ')this.setShape(-1);if(e.code==='KeyX')this.setShape(0)});window.addEventListener('keyup',e=>{if(e.code==='Space')this.releaseShot()});window.addEventListener('blur',()=>{if(this.charging)this.releaseShot()});window.addEventListener('pointerdown',e=>{if(e.target.closest('.game-hud,nav,.modal,button,.account-gate'))return;this.dragging=true;this.dragStart=e.clientX});window.addEventListener('pointermove',e=>{if(this.dragging&&!this.bagPhase&&!this.swinging&&!this.charging)this.orbit+=(e.clientX-this.dragStart)*.003;this.dragStart=e.clientX});window.addEventListener('pointerup',()=>this.dragging=false)}
