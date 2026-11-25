@@ -1,9 +1,9 @@
-import {buildBag} from './golf-bag.js?v=locker1';
+import {buildBag} from './golf-bag.js?v=contact1';
 import {contactTime} from './shot-pose.js?v=approach2';
 import {CLUB_IRONS,curveAcceleration} from './irons.js?v=irons1';
 import * as THREE from 'three';
 import {World,COURSES} from './world.js?v=clubcraft';
-import {Golfer} from './actors.js?v=locker1';
+import {Golfer} from './actors.js?v=contact1';
 const clamp=THREE.MathUtils.clamp,$=id=>document.getElementById(id);
 const SHAPES=['HOOK','DRAW','STRAIGHT','FADE','SLICE'];
 const BAG_TAGS={driver:'Driver',wood:'3W',hybrid:'4H',pitching:'PW',approach:'AW',wedge:'SW',lob:'LW',putter:'Putter'};
@@ -247,7 +247,30 @@ export class GolfGame{
  startCharge(){if(this.bagPhase||!this.started||this.swinging||this.modal||this.charging)return;this.placeGolfer();this.charging=true;this.orbit=0;this.moveCamera(0,true);this.charge=0;this.notify('HOLD SPACE FOR POWER · RELEASE TO SWING')}
  releaseShot(){if(!this.charging||this.swinging||this.modal)return;this.charging=false;const p=clamp(this.charge,.11,1);this.shots++;this.swinging=true;this.swingTimer=0;this.shotPreview.group.visible=false;this.onSfx('swing');this.cameraShotLine=this.shotDirection();this.shotOrigin=this.position.clone();this.carryYards=null;this.vel.copy(this.launchVelocity(p));this.flightShape=this.shotShape;this.impactSpin=CLUBS[this.club].isIron?CLUBS[this.club].spin:0;this.biteTimer=0;this.ballLaunchDelay=contactTime[this.shotName()];this.golfer.shot(this.shotName());this.notify(p>.74&&p<.88?'PURE STRIKE':'SHOT IN PLAY');this.refresh()}
  update(dt){dt=Math.min(dt,.04);this.golfer.update(dt);this.coachActor?.update(dt);if(this.bagPhase){this.updateBag(dt);return}if(this.charging){this.charge=Math.min(1,this.charge+dt*.8);this.refresh()}if(this.started){if(this.swinging){this.swingTimer+=dt;const flightTime=Math.min(dt,this.swingTimer-this.ballLaunchDelay);for(let left=flightTime;left>1e-8&&this.swinging;left-=1/120)this.stepBall(Math.min(left,1/120))}this.moveCamera(dt)}else this.menuCamera(dt);this.updateContactShadow()}
- stepBall(dt){const airborne=this.carryYards===null||this.position.y>this.world.ground(this.position.x,this.position.z)+BALL_RADIUS+.015;this.advanceFlight(this.position,this.vel,dt,airborne);const g=this.world.ground(this.position.x,this.position.z)+BALL_RADIUS,lie=this.world.lie(this.position.x,this.position.z);if(lie==='WATER'&&this.position.y<=g+.015){this.shots++;this.position.copy(this.shotOrigin);this.vel.set(0,0,0);this.swinging=false;this.onSfx('hazard');this.notify('WATER · +1 PENALTY · REPLAY FROM LAST SPOT');this.ball.position.copy(this.position);this.placeGolfer();this.refresh();return}if(this.position.y<=g){this.position.y=g;if(this.carryYards===null)this.carryYards=this.travelYards();if(Math.abs(this.vel.y)>1.7&&this.club!=='putter'){this.onSfx('land');this.vel.y=Math.abs(this.vel.y)*.24;const iron=CLUBS[this.club].isIron?CLUBS[this.club]:null;const retention=iron?iron.stop:CLUBS[this.club].wedge?.46:this.club==='driver'?.64:.75;this.vel.x*=retention;this.vel.z*=retention;if(iron)this.biteTimer=.65}else{this.vel.y=0;const friction=lie==='GREEN'?1.9:lie==='FAIRWAY'?2.8:lie==='BUNKER'?7.5:5.5;const bite=CLUBS[this.club].isIron&&this.biteTimer>0?this.impactSpin/1700:0;this.biteTimer=Math.max(0,this.biteTimer-dt);const drag=Math.exp(-(friction+bite)*dt);this.vel.x*=drag;this.vel.z*=drag}}this.ball.position.copy(this.position);this.ball.rotation.x+=this.vel.z*dt*1.6;this.ball.rotation.z+=this.vel.x*dt*1.6;const dist=Math.hypot(this.position.x-this.world.holePosition.x,this.position.z-this.world.holePosition.z);if(this.course!=='range'&&dist<.38&&this.position.y<g+.4&&this.vel.length()<9){this.finishHole();return}if(this.vel.length()<.13&&Math.abs(this.position.y-g)<.015){this.vel.set(0,0,0);this.swinging=false;this.position.y=g;this.onSfx('land');
+ groundContact(lie,dt){
+  const first=this.carryYards===null;
+  if(first)this.carryYards=this.travelYards();
+  const sand=lie==='BUNKER',green=lie==='GREEN',club=CLUBS[this.club];
+  const descent=Math.max(0,-this.vel.y);
+  if(descent>1.7&&this.club!=='putter'){
+   this.onSfx('land');
+   const turfRetention=club.isIron?club.stop:club.wedge?.46:this.club==='driver'?.64:.75;
+   const retention=turfRetention*(sand?.23:green?.70:1);
+   this.vel.x*=retention;this.vel.z*=retention;
+   this.vel.y=descent*(sand?.045:green?.14:.24);
+   if(this.vel.y<.45)this.vel.y=0;
+   if(club.isIron)this.biteTimer=.65;
+   return;
+  }
+  // Catch shallow arrivals too, without applying the impact loss on every roll step.
+  const skid=first&&this.club!=='putter'?(sand?.24:green?.78:1):1;
+  const friction=sand?10:green?2.25:lie==='FAIRWAY'?2.8:5.5;
+  const bite=club.isIron&&this.biteTimer>0?this.impactSpin/1700:0;
+  this.biteTimer=Math.max(0,this.biteTimer-dt);
+  const drag=skid*Math.exp(-(friction+bite)*dt);
+  this.vel.x*=drag;this.vel.z*=drag;this.vel.y=0;
+ }
+ stepBall(dt){const airborne=this.carryYards===null||this.position.y>this.world.ground(this.position.x,this.position.z)+BALL_RADIUS+.015;this.advanceFlight(this.position,this.vel,dt,airborne);const g=this.world.ground(this.position.x,this.position.z)+BALL_RADIUS,lie=this.world.lie(this.position.x,this.position.z);if(lie==='WATER'&&this.position.y<=g+.015){this.shots++;this.position.copy(this.shotOrigin);this.vel.set(0,0,0);this.swinging=false;this.onSfx('hazard');this.notify('WATER · +1 PENALTY · REPLAY FROM LAST SPOT');this.ball.position.copy(this.position);this.placeGolfer();this.refresh();return}if(this.position.y<=g){this.position.y=g;this.groundContact(lie,dt)}this.ball.position.copy(this.position);this.ball.rotation.x+=this.vel.z*dt*1.6;this.ball.rotation.z+=this.vel.x*dt*1.6;const dist=Math.hypot(this.position.x-this.world.holePosition.x,this.position.z-this.world.holePosition.z);if(this.course!=='range'&&dist<.38&&this.position.y<g+.4&&this.vel.length()<9){this.finishHole();return}if(this.vel.length()<.13&&Math.abs(this.position.y-g)<.015){this.vel.set(0,0,0);this.swinging=false;this.position.y=g;this.onSfx('land');
  if(this.course==='range'){
   const total=this.travelYards();this.resetBallToTee();this.charge=0;
   this.placeGolfer();this.refresh();this.moveCamera(0,true);

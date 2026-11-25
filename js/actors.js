@@ -1,4 +1,4 @@
-import {clubModel,makeShaft,heelSocket} from './club-model.js?v=locker1';
+import {clubModel,makeShaft,heelSocket} from './club-model.js?v=contact1';
 import {loadFittedModel,fitToRig,tintGolfer} from './tour-golfer.js?v=canopy';
 import {measureShot,contactTime} from './shot-pose.js?v=approach2';
 import * as THREE from 'three';

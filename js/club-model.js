@@ -1,4 +1,5 @@
 import * as T from 'three';
+import {IRONS} from './irons.js';
 
 const finish=(color,metalness,roughness)=>new T.MeshStandardMaterial({color,metalness,roughness});
 const nickel=finish(0xc5cdd1,.57,.28),face=finish(0xadb9bf,.43,.38),carbon=finish(0x22313b,.42,.25);
@@ -54,6 +55,36 @@ function ironStamp(blade,number){
  const stamp=new T.Mesh(relief,nickel);stamp.name='Engraved '+number+' iron';
  stamp.position.set(.024,.001,-.0163);blade.add(stamp);
 }
+function forgedIron(head,id){
+ const spec=IRONS[id],n=spec.number,blade=new T.Group();
+ head.add(blade);blade.rotation.x=-T.MathUtils.degToRad(spec.degrees);
+ const top=.028+(n-3)*.0018,depth=.017-(n-3)*.0008;
+ // Rounded high toe, cambered leading edge and a narrow heel blending into the neck.
+ const outline=[[-.059,top-.012],[-.054,top],[-.040,top+.003],[.021,.018],
+  [.045,.009],[.049,-.003],[.043,-.014],[.026,-.018],[-.026,-.020],[-.055,-.016],[-.061,-.009]];
+ plate(blade,outline,.005,nickel,-.005,.0011);
+ const rim=roundedOutline(outline);
+ const cavity=roundedOutline([[-.050,top-.006],[-.036,top-.003],[.024,.010],[.034,.004],
+  [.028,-.005],[.012,-.008],[-.040,-.009],[-.052,-.003]]);
+ rim.holes.push(new T.Path(cavity.getPoints(32)));
+ const casting=new T.Mesh(new T.ExtrudeGeometry(rim,{depth:depth-.005,bevelEnabled:true,bevelSize:.001,bevelThickness:.001,bevelSegments:3}),nickel);
+ casting.position.z=-depth;blade.add(casting);
+ const pad=new T.Mesh(new T.ShapeGeometry(cavity),insert);pad.material.side=T.DoubleSide;
+ pad.position.z=-.0064;blade.add(pad);
+ const facePanel=[[-.052,-.012],[.034,-.011],[.033,.004],[-.039,top-.002],[-.052,top-.005]];
+ plate(blade,facePanel,.0006,face,.0012,.0003);
+ for(let i=0;i<9;i++){
+  const y=-.009+i*.004;
+  const end=Math.min(.029,.031-(y-.002)*2.7);
+  stripes(blade,1,-.048,end,y,0,.00235,sole);
+ }
+ ironStamp(blade,n);
+ const stamp=blade.getObjectByName('Engraved '+n+' iron');
+ stamp.position.set(-.032,.006,-.0074);
+ const socket=heelSocket(id);
+ pin(head,[.038,-.006,-.005],socket.toArray(),.009,.0074,nickel);
+ pin(head,socket.clone().add(new T.Vector3(-.002,-.005,0)).toArray(),socket.toArray(),.0076,.0073,insert);
+}
 export function clubModel(id){
  if(templates.has(id))return templates.get(id).clone();
  const head=new T.Group(),wood=['driver','wood','hybrid'].includes(id),putt=id==='putter';
@@ -84,16 +115,17 @@ export function clubModel(id){
   }
   plate(head,[[-.04,-.010],[.04,-.010],[.04,.010],[-.04,.010]],.0015,insert,.004);
   const mark=new T.Mesh(new T.BoxGeometry(.003,.001,.022),paint);mark.position.set(0,.018,-.012);head.add(mark);
+ }else if(IRONS[id]){
+  forgedIron(head,id);
  }else{
-  const wedge=!id.startsWith('iron'),n=Number(id.slice(4))||7;
-  const toe=wedge?.039:.023+(n-3)*.0014;
+  const toe=.039;
   const outline=[[-.051,-.014],[-.041,-.021],[.035,-.020],[.053,-.014],[.058,.001],[.055,toe-.005],[.043,toe],[.018,toe-.002],[-.039,.012],[-.051,.005]];
-  const blade=new T.Group();head.add(blade);blade.rotation.x=-(wedge?.65:.23+(n-3)*.045);
-  plate(blade,outline,wedge?.014:.010,nickel,-.010);
-  stripes(blade,6,-.030,.042,-.014,.0044,wedge?.006:.002,sole);
+  const blade=new T.Group();head.add(blade);blade.rotation.x=-.65;
+  plate(blade,outline,.014,nickel,-.010);
+  stripes(blade,6,-.030,.042,-.014,.0044,.006,sole);
   plate(blade,[[-.035,-.012],[.041,-.012],[.045,.011],[.028,.014],[-.03,.003]],.002,insert,-.0135);
   plate(blade,[[-.038,-.016],[.046,-.015],[.044,-.008],[.019,-.005],[-.036,-.010]],.004,nickel,-.019);
-  if(!wedge)ironStamp(blade,n);
+
  }
  const group=new T.Group();group.add(head);
  group.traverse(o=>{if(o.isMesh)o.castShadow=true});templates.set(id,group);return group.clone();
@@ -102,7 +134,8 @@ export function clubModel(id){
 export function heelSocket(id){
  const size=id==='wood'?.84:id==='hybrid'?.72:1;
  if(['driver','wood','hybrid'].includes(id))return new T.Vector3(.055*size,.006*(id==='driver'?1:size*.88),-.010*size);
- return id==='putter'?new T.Vector3(-.041,.002,-.013):new T.Vector3(-.039,0,-.004);
+ if(IRONS[id])return new T.Vector3(.056,.036,-.005);
+ return id==='putter'?new T.Vector3(.044,.012,-.013):new T.Vector3(-.039,0,-.004);
 }
 export function makeShaft(){
  const shaft=new T.Group();
