@@ -4,8 +4,24 @@ const finish=(color,metalness,roughness)=>new T.MeshStandardMaterial({color,meta
 const nickel=finish(0xc5cdd1,.57,.28),face=finish(0xadb9bf,.43,.38),carbon=finish(0x22313b,.42,.25);
 const sole=finish(0x545e68,.58,.34),insert=finish(0x34454d,.36,.4),paint=finish(0xe8ebdf,.12,.42);
 const templates=new Map();
+export function lightClubs(renderer,environment){
+ const pmrem=new T.PMREMGenerator(renderer),map=pmrem.fromScene(environment,.045);
+ for(const material of [nickel,face,carbon,sole,insert,paint]){
+  material.envMap=map.texture;material.envMapIntensity=.75;material.needsUpdate=true;
+ }
+ environment.dispose();pmrem.dispose();
+}
+function roundedOutline(points){
+ const path=new T.Shape(),last=points.at(-1),first=points[0];
+ path.moveTo((last[0]+first[0])/2,(last[1]+first[1])/2);
+ for(let i=0;i<points.length;i++){
+  const [x,y]=points[i],next=points[(i+1)%points.length];
+  path.quadraticCurveTo(x,y,(x+next[0])/2,(y+next[1])/2);
+ }
+ return path;
+}
 function plate(parent,outline,depth,material,z=0,bevel=.0014){
- const path=new T.Shape(outline.map(([x,y])=>new T.Vector2(x,y)));
+ const path=roundedOutline(outline);
  const geometry=new T.ExtrudeGeometry(path,{depth,bevelEnabled:true,bevelThickness:bevel,bevelSize:bevel,bevelSegments:3,steps:1});
  const mesh=new T.Mesh(geometry,material);mesh.position.z=z;parent.add(mesh);return mesh;
 }
@@ -24,7 +40,8 @@ export function clubModel(id){
  if(templates.has(id))return templates.get(id).clone();
  const head=new T.Group(),wood=['driver','wood','hybrid'].includes(id),putt=id==='putter';
  if(wood){
-  const profile=[[-.052,-.014],[-.035,-.024],[.021,-.027],[.054,-.014],[.058,.004],[.043,.022],[.006,.029],[-.033,.025],[-.054,.011]];
+  const corners=[[-.052,-.014],[-.035,-.024],[.021,-.027],[.054,-.014],[.058,.004],[.043,.022],[.006,.029],[-.033,.025],[-.054,.011]];
+  const profile=roundedOutline(corners).getSpacedPoints(54).slice(0,-1).map(p=>[p.x,p.y]);
   // A broad, flat titanium face closes a swept-back, tapered crown.
   const rings=[[1,0],[1.05,-.016],[1,-.039],[.78,-.067],[.38,-.084],[.05,-.09]];
   const verts=[],idx=[];for(const [scale,z] of rings)for(const [x,y] of profile)verts.push(x*scale,y*scale+.005*Math.sin(-z*32),z);
@@ -33,7 +50,7 @@ export function clubModel(id){
    idx.push(a,b,a+profile.length,b,b+profile.length,a+profile.length);
   }
   const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(verts,3));g.setIndex(idx);g.computeVertexNormals();
-  const crown=carbon.clone();crown.side=T.DoubleSide;head.add(new T.Mesh(g,crown));
+  carbon.side=T.DoubleSide;head.add(new T.Mesh(g,carbon));
   plate(head,profile,.002,face);stripes(head,5,-.037,.041,-.014,.006,.004,sole);
   pin(head,[-.045,.006,-.018],[-.046,.050,-.008],.011,.007,nickel);
   const size=id==='driver'?1:id==='wood'?.84:.72;head.scale.set(size,id==='driver'?1:size*.88,size);

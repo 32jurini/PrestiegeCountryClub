@@ -1,11 +1,14 @@
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {lightClubs} from './club-model.js?v=forge';
 import * as THREE from 'three';
-import {GolfGame} from './game.js?v=clubcraft';
+import {GolfGame} from './game.js?v=forge';
 import {SoundEngine} from './sound.js';
 import {OnlineRoom} from './online.js?v=friends1';
 import {FriendsService,isOnline} from './friends.js?v=friends1';
 const $=id=>document.getElementById(id);
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(window.devicePixelRatio,1.6));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;$('viewport').appendChild(renderer.domElement);
 const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(54,innerWidth/innerHeight,.1,1100);const sun=new THREE.DirectionalLight(0xffe7c7,2.1);sun.position.set(-65,100,42);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-14;sun.shadow.camera.right=14;sun.shadow.camera.top=14;sun.shadow.camera.bottom=-14;sun.shadow.camera.near=.5;sun.shadow.camera.far=320;sun.shadow.normalBias=.009;sun.shadow.bias=-.00012;scene.add(sun.target);scene.add(sun);scene.add(new THREE.HemisphereLight(0xc3e8ff,0x55513e,1.25));
+lightClubs(renderer,new RoomEnvironment());
 const game=new GolfGame(renderer,scene,camera),sound=new SoundEngine();game.onSfx=e=>sound.play(e);let page='home',accountMode='create',activeUser=null;
 const preview = document.querySelector('#golfer .preview');
 function sizeCanvas() {

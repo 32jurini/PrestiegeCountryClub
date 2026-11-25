@@ -1,4 +1,4 @@
-import {clubModel,makeShaft} from './club-model.js';
+import {clubModel,makeShaft} from './club-model.js?v=forge';
 import {loadFittedModel,fitToRig,tintGolfer} from './tour-golfer.js?v=canopy';
 import {measureShot,contactTime} from './shot-pose.js?v=approach2';
 import * as THREE from 'three';

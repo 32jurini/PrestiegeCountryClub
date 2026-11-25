@@ -1,9 +1,9 @@
-import {buildBag} from './golf-bag.js?v=clubcraft';
+import {buildBag} from './golf-bag.js?v=forge';
 import {contactTime} from './shot-pose.js?v=approach2';
 import {CLUB_IRONS,curveAcceleration} from './irons.js?v=irons1';
 import * as THREE from 'three';
 import {World,COURSES} from './world.js?v=clubcraft';
-import {Golfer} from './actors.js?v=clubcraft';
+import {Golfer} from './actors.js?v=forge';
 const clamp=THREE.MathUtils.clamp,$=id=>document.getElementById(id);
 const SHAPES=['HOOK','DRAW','STRAIGHT','FADE','SLICE'];
 const BAG_TAGS={driver:'Driver',wood:'3W',hybrid:'4H',pitching:'PW',approach:'AW',wedge:'SW',lob:'LW',putter:'Putter'};
