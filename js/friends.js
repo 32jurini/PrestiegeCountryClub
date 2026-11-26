@@ -84,19 +84,23 @@ export class FriendsService {
   await this.addFriend(req.fromUid);
  }
  async reject(id){const req=this.requests.find(r=>r.id===id);if(req)await this.api.updateDoc(this.api.doc(this.db,'requests',id),{status:'declined'})}
- async refreshFriends(){
-  const list=this.profile?.friends||[];if(!list.length){this.friends=[];this.emit();return}
-  const a=this.api,db=this.db;
-  const snapshots=await Promise.all(list.slice(0,100).map(uid=>a.getDoc(a.doc(db,'players',uid)).catch(()=>null)));
-  this.friends=snapshots.filter(s=>s?.exists()).map(s=>({uid:s.id,...s.data()}));this.emit();
+ refreshFriends(){
+  const ids=(this.profile?.friends||[]).slice(0,100),key=JSON.stringify(ids);
+  if(key===this.friendKey)return;this.friendKey=key;
+  (this.friendListeners||[]).forEach(stop=>stop());this.friends=[];
+  const a=this.api;
+  this.friendListeners=ids.map(uid=>a.onSnapshot(a.doc(this.db,'players',uid),snap=>{
+   this.friends=this.friends.filter(f=>f.uid!==uid);
+   if(snap.exists())this.friends.push({uid,...snap.data()});this.emit();
+  }));
  }
- async host(code,course){
+ async host(code,course,invited=null){
   if(!this.profile?.username)return;
-  await this.api.updateDoc(this.api.doc(this.db,'players',this.user.uid),{hosting:code,course,lastSeen:this.api.serverTimestamp()});
+  await this.api.updateDoc(this.api.doc(this.db,'players',this.user.uid),{hosting:code,course,invited,lastSeen:this.api.serverTimestamp()});
  }
  async unhost(){
   if(!this.profile?.username)return;
-  await this.api.updateDoc(this.api.doc(this.db,'players',this.user.uid),{hosting:null,course:null});
+  await this.api.updateDoc(this.api.doc(this.db,'players',this.user.uid),{hosting:null,course:null,invited:null});
  }
 }
 export function isOnline(player){return typeof player?.lastSeen?.toMillis==='function'&&Date.now()-player.lastSeen.toMillis()<90000}

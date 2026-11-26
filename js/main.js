@@ -1,18 +1,20 @@
+import {Clubhouse} from './clubhouse.js?v=lobby1';
 import {poloTile} from './polo-patterns.js?v=playergear1';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {lightClubs} from './club-model.js?v=wedges1';
 import * as THREE from 'three';
 import {GolfGame} from './game.js?v=curl2';
 import {SoundEngine} from './sound.js?v=strikefield';
-import {OnlineRoom} from './online.js?v=friends1';
-import {FriendsService,isOnline} from './friends.js?v=friends1';
+import {OnlineRoom} from './online.js?v=lobby1';
+import {FriendsService,isOnline} from './friends.js?v=lobby1';
 import {walletKey,wallet,catalog,itemById,award,buy,wear} from './locker.js?v=playergear1';
 const $=id=>document.getElementById(id);
-const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(window.devicePixelRatio,1.6));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;$('viewport').appendChild(renderer.domElement);
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(window.devicePixelRatio,1.6));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;$('viewport').appendChild(renderer.domElement);
 const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(54,innerWidth/innerHeight,.1,1100);const sun=new THREE.DirectionalLight(0xffe7c7,2.1);sun.position.set(-65,100,42);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-14;sun.shadow.camera.right=14;sun.shadow.camera.top=14;sun.shadow.camera.bottom=-14;sun.shadow.camera.near=.5;sun.shadow.camera.far=320;sun.shadow.normalBias=.009;sun.shadow.bias=-.00012;scene.add(sun.target);scene.add(sun);scene.add(new THREE.HemisphereLight(0xc3e8ff,0x55513e,1.25));
 lightClubs(renderer,new RoomEnvironment());
 const game=new GolfGame(renderer,scene,camera),sound=new SoundEngine();game.onSfx=(event,detail)=>sound.play(event,detail);let page='home',accountMode='create',activeUser=null;
 const preview = document.querySelector('#golfer .preview');
+const stage=$('lobbyStage'),lobby=new Clubhouse(game.golfer,stage,finishShirt);
 function sizeCanvas() {
  const box = renderer.domElement.parentElement.getBoundingClientRect();
  if (!box.width || !box.height) return;
@@ -20,8 +22,8 @@ function sizeCanvas() {
  camera.updateProjectionMatrix();
  renderer.setSize(box.width, box.height);
 }
-new ResizeObserver(sizeCanvas).observe(preview);
-const showPage=id=>{if(id!=='playing'&&page==='playing'&&onlineActive)endOnline();page=id;document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===id));document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('selected',b.dataset.page===id));document.body.classList.toggle('is-playing',id==='playing');(id==='golfer'?preview:$('viewport')).appendChild(renderer.domElement);sizeCanvas();if(id==='store'||id==='locker')renderGear();if(id!=='playing'){game.enterMenu();if(id==='golfer')game.enterPreview()}};
+new ResizeObserver(sizeCanvas).observe(preview);new ResizeObserver(sizeCanvas).observe(stage);
+const showPage=id=>{if(id!=='playing'&&page==='playing'&&onlineActive)endOnline();if(page==='home')scene.add(game.golfer.root);page=id;document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===id));document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('selected',b.dataset.page===id));document.body.classList.toggle('is-playing',id==='playing');(id==='home'?stage:id==='golfer'?preview:$('viewport')).appendChild(renderer.domElement);sizeCanvas();if(id==='store'||id==='locker')renderGear();if(id!=='playing'){game.enterMenu();if(id==='golfer')game.enterPreview();if(id==='home'){lobby.enter();refreshTags();if(room.connected)room.send({type:'appearance',profile:playerCard()})}}};
 const showError=msg=>{$('accountFeedback').textContent=msg;$('accountFeedback').classList.remove('hidden')};
 const hex=bytes=>Array.from(new Uint8Array(bytes)).map(b=>b.toString(16).padStart(2,'0')).join('');
 async function hashPassword(password){if(!globalThis.crypto?.subtle)throw new Error('Secure sign-in requires HTTPS. Open the published GitHub Pages website.');const bytes=new TextEncoder().encode(password);return hex(await crypto.subtle.digest('SHA-256',bytes))}
@@ -42,9 +44,14 @@ const renderLesson=()=>{const [title,body,action]=lessons[lessonIndex];$('coachT
 const closeTutorial=()=>{$('tutorialOverlay').classList.add('hidden');try{localStorage.setItem('prestiege-v4-tutorial-done','yes')}catch{}};
 const openTutorial=()=>{lessonIndex=0;$('tutorialOverlay').classList.remove('hidden');renderLesson()};
 $('coachNext').onclick=()=>{if(++lessonIndex>=lessons.length)closeTutorial();else renderLesson()};$('coachSkip').onclick=closeTutorial;
-const start=async(name='royal',tutorial=false)=>{showPage('playing');$('loader').classList.remove('hidden');try{await game.begin(name,tutorial);$('loader').classList.add('hidden');if(tutorial)openTutorial()}catch(e){$('loader').classList.add('hidden');$('error').textContent='Could not start round: '+e.message;$('error').classList.remove('hidden')}};
+const start=async(name='royal',tutorial=false)=>{
+ if(room.connected&&!room.inMatch){
+  if(name!=='range'&&room.role==='host'){room.startMatch(name);return}
+  showPage('home');onlinePanel.classList.remove('hidden');onlineStatus.textContent=name==='range'?'Leave the party to enter the solo driving range.':'Your host selects the course.';return;
+ }
+ showPage('playing');$('loader').classList.remove('hidden');try{await game.begin(name,tutorial);$('loader').classList.add('hidden');if(tutorial)openTutorial()}catch(e){$('loader').classList.add('hidden');$('error').textContent='Could not start round: '+e.message;$('error').classList.remove('hidden')}};
 document.querySelectorAll('[data-page]').forEach(b=>b.addEventListener('click',()=>showPage(b.dataset.page)));
-$('heroPlay').onclick=()=>{if(!localStorage.getItem('prestiege-v4-tutorial-done'))start('royal',true);else showPage('courses')};document.querySelectorAll('[data-course]').forEach(b=>b.addEventListener('click',()=>start(b.dataset.course,!localStorage.getItem('prestiege-v4-tutorial-done'))));$('rangeTab').onclick=()=>start('range',false);$('exitRound').onclick=()=>showPage('courses');$('toClubhouse').onclick=()=>showPage('courses');$('nextHole').onclick=()=>game.actionNext();$('resetAim').onclick=()=>{game.aimDelta(-game.aim)};$('openBag').onclick=()=>game.openBag();
+$('heroPlay').onclick=()=>{if(room.connected){room.startMatch($('onlineCourse').value);return}if(!localStorage.getItem('prestiege-v4-tutorial-done'))start('royal',true);else showPage('courses')};document.querySelectorAll('[data-course]').forEach(b=>b.addEventListener('click',()=>start(b.dataset.course,!localStorage.getItem('prestiege-v4-tutorial-done'))));$('rangeTab').onclick=()=>start('range',false);$('exitRound').onclick=()=>showPage('courses');$('toClubhouse').onclick=()=>showPage('courses');$('nextHole').onclick=()=>game.actionNext();$('resetAim').onclick=()=>{game.aimDelta(-game.aim)};$('openBag').onclick=()=>game.openBag();
 $('closeBag').onclick=()=>game.returnFromBag(game.club);
 $('bagContents').addEventListener('click',event=>{
  const button=event.target.closest('[data-pick]');
@@ -66,7 +73,11 @@ function applyGear(){
  const {equipped}=wallet(),shirt=itemById(equipped.shirt),ball=itemById(equipped.ball);
  game.ball.material.color.set(ball.color);
  game.golfer.applyAppearance(palette());
- const fabric=game.golfer.outfit?.shirt;
+ finishShirt(game.golfer,shirt.id);
+}
+function finishShirt(actor,id){
+ const shirt=itemById(id)?.slot==='shirt'?itemById(id):itemById('custom');
+ const fabric=actor.outfit?.shirt;
  if(!fabric||fabric.userData.finish===shirt.id)return;
  fabric.userData.finish=shirt.id;
  fabric.customProgramCacheKey=()=>shirt.pattern||'club-solid';
@@ -130,10 +141,31 @@ const onlinePanel=$('onlinePanel'),onlineStatus=$('onlineStatus'),onlineCode=$('
 const ghost=new THREE.Mesh(new THREE.SphereGeometry(.075,16,12),new THREE.MeshStandardMaterial({color:0xffca69,emissive:0x3c2500,emissiveIntensity:.2}));
 ghost.castShadow=true;ghost.visible=false;scene.add(ghost);
 let onlineActive=false,remoteState=null,lastSent=0;let remoteTarget=new THREE.Vector3();
-let friendsReady=false;const friends=new FriendsService(()=>renderFriends());
+let friendsReady=false,connectingFriends=null,inviteTo=null;
+function playerCard(){
+ return {name:friends.profile?.username||activeUser?.username||$('golferName').value||'Rookie',frame:$('golferFrame').value,colors:palette(),pattern:wallet().equipped.shirt};
+}
+function refreshTags(){
+ const name=playerCard().name;
+ $('localName').textContent='@'+name;$('headerTag').textContent='@'+name;
+ const party=!!room.remoteName;$('partyCount').textContent='PARTY · '+(party?'2':'1')+' / 2';
+ $('inviteFriend').hidden=party;$('leaveParty').hidden=!room.room;
+ $('heroPlay').disabled=party&&room.role==='guest';
+ $('onlineJoin').disabled=$('onlineHost').disabled=$('createParty').disabled=party;
+ $('heroPlay').querySelector('strong').textContent=party&&room.role==='guest'?'Waiting for host':'Play Now';
+ $('inviteDot').hidden=!friends.friends.some(f=>f.hosting&&f.invited===friends.user?.uid&&isOnline(f)&&!party);
+}
+const friends=new FriendsService(()=>renderFriends());
 const room=new OnlineRoom({
- onHosted:(code,course)=>friends.host(code,course).then(()=>{onlineStatus.textContent='Hosting '+course.toUpperCase()+' — friends can now join you'}).catch(err=>onlineStatus.textContent=err.message),
- onStatus:message=>{onlineStatus.textContent=message;onlineCode.textContent=room.role==='host'&&room.room?'ROOM CODE: '+room.room:'';},
+ profile:playerCard,
+ onParty:(profile,joined)=>{
+  const colors={};for(const key of Object.keys(palette()))if(/^#[0-9a-f]{6}$/i.test(profile.colors?.[key]))colors[key]=profile.colors[key];
+  lobby.member({name:room.remoteName,frame:profile.frame==='female'?'female':'male',colors,pattern:profile.pattern}).catch(showFriendsError);
+  if(joined){onlinePanel.classList.add('hidden');if(page!=='home')showPage('home');if(room.role==='host')friends.unhost().catch(showFriendsError)}
+  refreshTags();
+ },
+ onHosted:(code,course)=>friends.host(code,course,inviteTo).then(()=>{onlineStatus.textContent=inviteTo?'Party invitation sent. Your friend can accept it in Friends.':'Party open. Share the invite link or code.'}).catch(err=>onlineStatus.textContent=err.message),
+ onStatus:message=>{refreshTags();onlineCode.hidden=$('onlineCopy').hidden=room.role!=='host'||!room.room;onlineStatus.textContent=message;onlineCode.textContent=room.role==='host'&&room.room?'ROOM CODE: '+room.room:'';},
  onStart:async(course,opponent)=>{
   onlineActive=true;remoteState=null;ghost.visible=false;onlinePanel.classList.add('hidden');
   $('rivalName').textContent=opponent.toUpperCase();rivalStats.hidden=false;
@@ -148,11 +180,11 @@ const room=new OnlineRoom({
   const total=(Array.isArray(state.scores)?state.scores:[]).reduce((a,b)=>a+(Number(b)||0),0);
   $('rivalScore').textContent='HOLE '+(Number(state.hole)+1)+' · '+Number(state.strokes)+' SHOTS · '+total+' FINISHED';
  },
- onDisconnect:()=>{ghost.visible=false;if(onlineActive){$('rivalScore').textContent='FRIEND DISCONNECTED';onlineActive=false}}
+ onDisconnect:()=>{lobby.member(null);refreshTags();ghost.visible=false;if(onlineActive){$('rivalScore').textContent='FRIEND DISCONNECTED';onlineActive=false}}
 });
 function endOnline(){onlineActive=false;remoteState=null;ghost.visible=false;ghost.userData.initialized=false;rivalStats.hidden=true;room.close();friends.unhost().catch(()=>{})}
 function renderFriends(){
- const login=$('friendsLogin'),content=$('friendsContent'),status=$('friendsStatus'),list=$('friendsList'),inbox=$('friendsInbox');
+ refreshTags();const login=$('friendsLogin'),content=$('friendsContent'),status=$('onlineStatus'),list=$('friendsList'),inbox=$('friendsInbox');
  if(!friendsReady){login.hidden=false;content.hidden=true;return}
  if(!friends.profile?.username){login.hidden=false;content.hidden=true;status.textContent='Choose a unique online username for this browser.';return}
  login.hidden=true;content.hidden=false;$('friendsMe').textContent='SIGNED IN AS @'+friends.profile.username;
@@ -170,8 +202,11 @@ function renderFriends(){
   const item=document.createElement('div');item.className='friend-row';
   const name=document.createElement('span');name.textContent='@'+friend.username+' · '+(isOnline(friend)?friend.hosting?'HOSTING '+friend.course?.toUpperCase():'ONLINE':'OFFLINE');
   item.append(name);
-  if(friend.hosting&&isOnline(friend)){
-   const join=document.createElement('button');join.textContent='JOIN GAME';
+  if(!room.connected&&(!room.role||room.role==='host')&&isOnline(friend)){
+   const invite=document.createElement('button');invite.textContent='INVITE';invite.onclick=()=>hostParty(friend.uid);item.append(invite);
+  }
+  if(!room.connected&&friend.hosting&&isOnline(friend)&&(!friend.invited||friend.invited===friends.user.uid)){
+   const join=document.createElement('button');join.textContent=friend.invited?'ACCEPT INVITE':'JOIN PARTY';
    join.onclick=()=>room.join(friend.hosting,friends.profile.username);
    item.append(join);
   }
@@ -183,24 +218,40 @@ function showFriendsError(error){onlineStatus.textContent=error.message||String(
 async function openFriends(){
  onlinePanel.classList.remove('hidden');
  try{
-  if(!friendsReady){onlineStatus.textContent='Connecting to online friends…';await friends.init();friendsReady=true}
+  await connectFriends()
   renderFriends();onlineStatus.textContent=friends.profile?.username?'Search for a username or host a round':'Choose your online username';
- }catch(error){onlineStatus.textContent=error.message;friendsReady=false}
+ }catch(error){onlineStatus.textContent='Friends list unavailable. You can still create an invite link or join by code.';friendsReady=false}
 }
 $('friendsRegister').onclick=async()=>{try{await friends.register($('friendsUsername').value);renderFriends();onlineStatus.textContent='Username registered — add your first friend!'}catch(error){showFriendsError(error)}};
 $('friendsAdd').onclick=async()=>{try{const name=await friends.sendRequest($('friendsSearch').value);onlineStatus.textContent='Friend request sent to @'+name}catch(error){showFriendsError(error)}};
 $('onlineOpen').onclick=()=>{showPage('home');openFriends()};
 $('onlineClose').onclick=()=>onlinePanel.classList.add('hidden');
-$('onlineHost').onclick=()=>{if(!friends.profile?.username){onlineStatus.textContent='Register your online username first';return}room.host($('onlineCourse').value,friends.profile.username)};
-$('onlineJoin').onclick=()=>{if(!friends.profile?.username){onlineStatus.textContent='Register your online username first';return}room.join($('onlineJoinCode').value,friends.profile.username)};
-$('onlineCopy').onclick=()=>{if(room.room){navigator.clipboard?.writeText(room.room);onlineStatus.textContent='Room code copied — send it to your friend'}};
+function connectFriends(){
+ if(!connectingFriends)connectingFriends=friends.init().then(()=>{friendsReady=true;renderFriends()}).catch(err=>{connectingFriends=null;throw err});
+ return connectingFriends;
+}
+async function hostParty(uid=null){
+ if(room.connected)return;
+ inviteTo=uid;
+ if(room.role==='host'&&room.peer?.open){
+  try{await friends.host(room.room,$('onlineCourse').value,uid);onlineStatus.textContent=uid?'Party invite sent':'Party is open'}catch(e){showFriendsError(e)}
+ }else await room.host($('onlineCourse').value,playerCard().name);
+}
+$('homeRange').onclick=()=>$('rangeTab').click();
+$('inviteFriend').onclick=openFriends;
+$('leaveParty').onclick=()=>{endOnline();refreshTags()};
+$('onlineHost').onclick=$('createParty').onclick=()=>hostParty();
+$('onlineJoin').onclick=()=>room.join($('onlineJoinCode').value,playerCard().name);
+$('onlineCopy').onclick=async()=>{const url=new URL(location.href);url.search='';url.searchParams.set('party',room.room);try{await navigator.clipboard.writeText(url.href);onlineStatus.textContent='Invite link copied'}catch{onlineStatus.textContent=url.href}};
+const inviteCode=new URL(location.href).searchParams.get('party');
+if(/^[A-Z0-9]{6}$/i.test(inviteCode||'')){$('onlineJoinCode').value=inviteCode;onlinePanel.classList.remove('hidden');onlineStatus.textContent='You have a clubhouse invitation. Select Join Party.'}
 const sunOffset=new THREE.Vector3(-39,53,27);
-function loop(){requestAnimationFrame(loop);const dt=Math.min(game.clock.getDelta(),.05);game.update(dt);if(onlineActive&&room.connected&&game.started&&performance.now()-lastSent>110){lastSent=performance.now();room.send(room.snapshot(game))}if(ghost.visible)ghost.position.lerp(remoteTarget,Math.min(1,dt*13));const course=game.world.current;
+function loop(){requestAnimationFrame(loop);const dt=Math.min(game.clock.getDelta(),.05);if(page==='home'){lobby.draw(renderer,dt);return}game.update(dt);if(onlineActive&&room.connected&&game.started&&performance.now()-lastSent>110){lastSent=performance.now();room.send(room.snapshot(game))}if(ghost.visible)ghost.position.lerp(remoteTarget,Math.min(1,dt*13));const course=game.world.current;
  if(sun.userData.course!==course){
   sun.userData.course=course;
   const settings=course==='misty'?[-24,12,-64,0xffbb85,1.75]:course==='ocean'?[-48,34,16,0xffe4bc,2.15]:course==='summit'?[29,55,-38,0xfff2df,2.02]:[-39,43,27,0xffdfb3,2.08];
   sunOffset.set(settings[0],settings[1],settings[2]);sun.color.setHex(settings[3]);sun.intensity=settings[4];
  }
- sun.target.position.copy(game.position);sun.position.copy(game.position).add(sunOffset);renderer.render(scene,camera)}window.addEventListener('resize',sizeCanvas);loop();
+ sun.target.position.copy(game.position);sun.position.copy(game.position).add(sunOffset);renderer.render(scene,camera)}window.addEventListener('resize',sizeCanvas);showPage('home');connectFriends().catch(()=>{});loop();
 window.dispatchEvent(new Event('pcc-game-ready'));
-(async()=>{$('loader').classList.add('hidden');const account=readAccount();if(account){activeUser=account;$('accountBtn').textContent=account.username.toUpperCase()}$('accountGate').classList.add('hidden');document.body.classList.remove('gated');try{await equip()}catch(e){console.warn('Golfer preview unavailable:',e);$('modelSource').textContent='MODEL WILL LOAD WHEN ASSETS ARE AVAILABLE'}})();
+(async()=>{$('loader').classList.add('hidden');const account=readAccount();if(account){activeUser=account;$('accountBtn').textContent=account.username.toUpperCase()}$('accountGate').classList.add('hidden');document.body.classList.remove('gated');refreshTags();try{await equip()}catch(e){console.warn('Golfer preview unavailable:',e);$('modelSource').textContent='MODEL WILL LOAD WHEN ASSETS ARE AVAILABLE'}})();
