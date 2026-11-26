@@ -1,7 +1,9 @@
 // Peer-to-peer, private two-player rooms. PeerJS Cloud provides signaling only.
 // No account verification, server-side scoring, persistent matchmaking or reconnection yet.
+const courses = ['royal', 'ocean', 'summit', 'misty'];
 export class OnlineRoom {
- constructor({onStatus,onStart,onState,onDisconnect,onHosted,onParty,profile}) {
+ constructor({onStatus,onStart,onState,onDisconnect,onHosted,onParty,onVote,profile}) {
+  this.onVote=onVote;this.ballot=null;
   this.onParty=onParty;this.profile=profile;
   this.onStatus=onStatus;this.onStart=onStart;this.onState=onState;this.onDisconnect=onDisconnect;this.onHosted=onHosted;
   this.peer=null;this.connection=null;this.role='';this.room='';this.connected=false;
@@ -11,10 +13,30 @@ export class OnlineRoom {
   const module=await import('https://cdn.jsdelivr.net/npm/peerjs@1.5.5/+esm');
   return module.Peer||module.default;
  }
- cleanup(){clearTimeout(this.joinTimer);this.generation=(this.generation||0)+1;const c=this.connection,p=this.peer;this.connection=null;this.peer=null;this.connected=false;this.inMatch=false;this.remoteName='';this.role='';this.room='';c?.close();p?.destroy()}
- startMatch(course=this.course){
-  if(this.role!=='host'||!this.connected||!this.remoteName||this.inMatch)return;
-  this.inMatch=true;this.send({type:'start',course});this.onStart?.(course,this.remoteName);
+ cleanup(){this.ballot=null;clearTimeout(this.joinTimer);this.generation=(this.generation||0)+1;const c=this.connection,p=this.peer;this.connection=null;this.peer=null;this.connected=false;this.inMatch=false;this.remoteName='';this.role='';this.room='';c?.close();p?.destroy()}
+ beginVote(){
+  if(!this.connected||!this.remoteName||this.inMatch||this.ballot)return;
+  if(this.role==='guest'){this.send({type:'requestVote'});return}
+  const id=crypto.randomUUID();this.ballot={id,host:null,guest:null};
+  this.send({type:'ballot',id});this.onVote?.(this.ballot);
+ }
+ vote(course){
+  if(!this.ballot||!courses.includes(course)||this.ballot[this.role])return;
+  this.ballot[this.role]=course;
+  this.send({type:'pick',id:this.ballot.id,course});
+  this.updateVote();
+ }
+ updateVote(){
+  const {host,guest,id}=this.ballot;
+  this.onVote?.(this.ballot);
+  if(this.role!=='host'||!host||!guest)return;
+  const course=host===guest?host:(Math.random()<.5?host:guest);
+  this.inMatch=true;this.ballot=null;
+  this.send({type:'start',id,course});this.onVote?.(null);this.onStart?.(course,this.remoteName);
+ }
+ cancelVote(){
+  if(!this.ballot||this.ballot[this.role])return;
+  this.send({type:'cancelVote',id:this.ballot.id});this.ballot=null;this.onVote?.(null);
  }
  close(){const active=!!this.peer;this.cleanup();if(active)this.onDisconnect?.();this.status('Disconnected')}
  async host(course,name){
@@ -61,12 +83,22 @@ export class OnlineRoom {
     this.remoteName=data.profile.name.slice(0,22)||'Friend';
     if(data.type==='hello')this.send({type:'party',profile:this.profile()});
     this.onParty?.(data.profile,data.type!=='appearance');
-   } else if(data.type==='start'&&this.role==='guest'&&!this.inMatch&&['royal','ocean','summit','misty'].includes(data.course)){
-    this.inMatch=true;this.onStart?.(data.course,this.remoteName);
+   } else if(data.type==='requestVote'&&this.role==='host'){
+    this.beginVote();
+   } else if(data.type==='ballot'&&this.role==='guest'&&!this.ballot&&!this.inMatch&&typeof data.id==='string'){
+    this.ballot={id:data.id,host:null,guest:null};this.onVote?.(this.ballot);
+   } else if(this.ballot&&data.id===this.ballot.id){
+    const other=this.role==='host'?'guest':'host';
+    if(data.type==='cancelVote'){this.ballot=null;this.onVote?.(null)}
+    else if(data.type==='pick'&&!this.ballot[other]&&courses.includes(data.course)){
+     this.ballot[other]=data.course;this.updateVote();
+    }else if(data.type==='start'&&this.role==='guest'&&this.ballot.host&&this.ballot.guest&&[this.ballot.host,this.ballot.guest].includes(data.course)){
+     this.ballot=null;this.inMatch=true;this.onVote?.(null);this.onStart?.(data.course,this.remoteName);
+    }
    } else if(data.type==='state'&&this.connected)this.onState?.(data);
    else if(data.type==='error')this.status(String(data.message||'Room unavailable'));
   });
-  connection.on('close',()=>{if(connection!==this.connection)return;this.connection=null;this.remoteName='';this.inMatch=false;this.connected=false;this.status('Opponent disconnected');this.onDisconnect?.()});
+  connection.on('close',()=>{if(connection!==this.connection)return;this.connection=null;this.ballot=null;this.onVote?.(null);this.remoteName='';this.inMatch=false;this.connected=false;this.status('Opponent disconnected');this.onDisconnect?.()});
   connection.on('error',error=>this.status('Peer connection: '+error.message));
  }
  send(data){if(this.connection?.open){try{this.connection.send(data)}catch(error){this.status('Unable to send: '+error.message)}}}

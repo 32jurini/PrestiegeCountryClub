@@ -5,7 +5,7 @@ import {lightClubs} from './club-model.js?v=wedges1';
 import * as THREE from 'three';
 import {GolfGame} from './game.js?v=curl2';
 import {SoundEngine} from './sound.js?v=strikefield';
-import {OnlineRoom} from './online.js?v=lobby1';
+import {OnlineRoom} from './online.js?v=vote1';
 import {FriendsService,isOnline} from './friends.js?v=lobby1';
 import {walletKey,wallet,catalog,itemById,award,buy,wear} from './locker.js?v=playergear1';
 const $=id=>document.getElementById(id);
@@ -46,12 +46,11 @@ const openTutorial=()=>{lessonIndex=0;$('tutorialOverlay').classList.remove('hid
 $('coachNext').onclick=()=>{if(++lessonIndex>=lessons.length)closeTutorial();else renderLesson()};$('coachSkip').onclick=closeTutorial;
 const start=async(name='royal',tutorial=false)=>{
  if(room.connected&&!room.inMatch){
-  if(name!=='range'&&room.role==='host'){room.startMatch(name);return}
-  showPage('home');onlinePanel.classList.remove('hidden');onlineStatus.textContent=name==='range'?'Leave the party to enter the solo driving range.':'Your host selects the course.';return;
+  showPage('home');room.beginVote();return;
  }
  showPage('playing');$('loader').classList.remove('hidden');try{await game.begin(name,tutorial);$('loader').classList.add('hidden');if(tutorial)openTutorial()}catch(e){$('loader').classList.add('hidden');$('error').textContent='Could not start round: '+e.message;$('error').classList.remove('hidden')}};
 document.querySelectorAll('[data-page]').forEach(b=>b.addEventListener('click',()=>showPage(b.dataset.page)));
-$('heroPlay').onclick=()=>{if(room.connected){room.startMatch($('onlineCourse').value);return}if(!localStorage.getItem('prestiege-v4-tutorial-done'))start('royal',true);else showPage('courses')};document.querySelectorAll('[data-course]').forEach(b=>b.addEventListener('click',()=>start(b.dataset.course,!localStorage.getItem('prestiege-v4-tutorial-done'))));$('rangeTab').onclick=()=>start('range',false);$('exitRound').onclick=()=>showPage('courses');$('toClubhouse').onclick=()=>showPage('courses');$('nextHole').onclick=()=>game.actionNext();$('resetAim').onclick=()=>{game.aimDelta(-game.aim)};$('openBag').onclick=()=>game.openBag();
+$('heroPlay').onclick=()=>{if(room.connected){room.beginVote();return}if(!localStorage.getItem('prestiege-v4-tutorial-done'))start('royal',true);else showPage('courses')};document.querySelectorAll('[data-course]').forEach(b=>b.addEventListener('click',()=>start(b.dataset.course,!localStorage.getItem('prestiege-v4-tutorial-done'))));$('rangeTab').onclick=()=>start('range',false);$('exitRound').onclick=()=>showPage('courses');$('toClubhouse').onclick=()=>showPage('courses');$('nextHole').onclick=()=>game.actionNext();$('resetAim').onclick=()=>{game.aimDelta(-game.aim)};$('openBag').onclick=()=>game.openBag();
 $('closeBag').onclick=()=>game.returnFromBag(game.club);
 $('bagContents').addEventListener('click',event=>{
  const button=event.target.closest('[data-pick]');
@@ -150,14 +149,26 @@ function refreshTags(){
  $('localName').textContent='@'+name;$('headerTag').textContent='@'+name;
  const party=!!room.remoteName;$('partyCount').textContent='PARTY · '+(party?'2':'1')+' / 2';
  $('inviteFriend').hidden=party;$('leaveParty').hidden=!room.room;
- $('heroPlay').disabled=party&&room.role==='guest';
- $('onlineJoin').disabled=$('onlineHost').disabled=$('createParty').disabled=party;
- $('heroPlay').querySelector('strong').textContent=party&&room.role==='guest'?'Waiting for host':'Play Now';
+ $('heroPlay').hidden=party;
+ $('onlineJoin').disabled=$('createParty').disabled=party;
+ $('multiplayer').querySelector('span').textContent=party?'Vote for course →':'Party play →';
  $('inviteDot').hidden=!friends.friends.some(f=>f.hosting&&f.invited===friends.user?.uid&&isOnline(f)&&!party);
 }
 const friends=new FriendsService(()=>renderFriends());
 const room=new OnlineRoom({
  profile:playerCard,
+ onVote:ballot=>{
+  const dialog=$('courseVote');
+  if(!ballot){if(dialog.open)dialog.close();return}
+  onlinePanel.classList.add('hidden');
+  if(!dialog.open)dialog.showModal();
+  const picked=ballot[room.role],other=ballot[room.role==='host'?'guest':'host'];
+  $('cancelVote').textContent=picked?'Leave party':'Back to lobby';
+  for(const button of dialog.querySelectorAll('[data-vote]')){
+   button.disabled=!!picked;button.setAttribute('aria-pressed',String(button.dataset.vote===picked));
+  }
+  $('voteStatus').textContent=picked?(other?'Votes are in.':'Vote locked. Waiting for @'+room.remoteName+'…'):(other?'Your friend has voted. Choose your course.':'Choose your course.');
+ },
  onParty:(profile,joined)=>{
   const colors={};for(const key of Object.keys(palette()))if(/^#[0-9a-f]{6}$/i.test(profile.colors?.[key]))colors[key]=profile.colors[key];
   lobby.member({name:room.remoteName,frame:profile.frame==='female'?'female':'male',colors,pattern:profile.pattern}).catch(showFriendsError);
@@ -184,7 +195,7 @@ const room=new OnlineRoom({
 });
 function endOnline(){onlineActive=false;remoteState=null;ghost.visible=false;ghost.userData.initialized=false;rivalStats.hidden=true;room.close();friends.unhost().catch(()=>{})}
 function renderFriends(){
- refreshTags();const login=$('friendsLogin'),content=$('friendsContent'),status=$('onlineStatus'),list=$('friendsList'),inbox=$('friendsInbox');
+ $('friendCount').textContent=friendsReady?' / '+friends.friends.length:'';refreshTags();const login=$('friendsLogin'),content=$('friendsContent'),status=$('onlineStatus'),list=$('friendsList'),inbox=$('friendsInbox');
  if(!friendsReady){login.hidden=false;content.hidden=true;return}
  if(!friends.profile?.username){login.hidden=false;content.hidden=true;status.textContent='Choose a unique online username for this browser.';return}
  login.hidden=true;content.hidden=false;$('friendsMe').textContent='SIGNED IN AS @'+friends.profile.username;
@@ -200,7 +211,7 @@ function renderFriends(){
  list.replaceChildren();
  for(const friend of friends.friends){
   const item=document.createElement('div');item.className='friend-row';
-  const name=document.createElement('span');name.textContent='@'+friend.username+' · '+(isOnline(friend)?friend.hosting?'HOSTING '+friend.course?.toUpperCase():'ONLINE':'OFFLINE');
+  const name=document.createElement('span');name.textContent='@'+friend.username+' · '+(isOnline(friend)?friend.hosting?'IN LOBBY':'ONLINE':'OFFLINE');
   item.append(name);
   if(!room.connected&&(!room.role||room.role==='host')&&isOnline(friend)){
    const invite=document.createElement('button');invite.textContent='INVITE';invite.onclick=()=>hostParty(friend.uid);item.append(invite);
@@ -219,10 +230,11 @@ async function openFriends(){
  onlinePanel.classList.remove('hidden');
  try{
   await connectFriends()
-  renderFriends();onlineStatus.textContent=friends.profile?.username?'Search for a username or host a round':'Choose your online username';
+  renderFriends();onlineStatus.textContent=friends.profile?.username?'Search for a gamertag or invite a friend.':'Choose your online username';
  }catch(error){onlineStatus.textContent='Friends list unavailable. You can still create an invite link or join by code.';friendsReady=false}
 }
 $('friendsRegister').onclick=async()=>{try{await friends.register($('friendsUsername').value);renderFriends();onlineStatus.textContent='Username registered — add your first friend!'}catch(error){showFriendsError(error)}};
+$('friendsSearch').addEventListener('keydown',event=>{if(event.key==='Enter')$('friendsAdd').click()});
 $('friendsAdd').onclick=async()=>{try{const name=await friends.sendRequest($('friendsSearch').value);onlineStatus.textContent='Friend request sent to @'+name}catch(error){showFriendsError(error)}};
 $('onlineOpen').onclick=()=>{showPage('home');openFriends()};
 $('onlineClose').onclick=()=>onlinePanel.classList.add('hidden');
@@ -234,13 +246,19 @@ async function hostParty(uid=null){
  if(room.connected)return;
  inviteTo=uid;
  if(room.role==='host'&&room.peer?.open){
-  try{await friends.host(room.room,$('onlineCourse').value,uid);onlineStatus.textContent=uid?'Party invite sent':'Party is open'}catch(e){showFriendsError(e)}
- }else await room.host($('onlineCourse').value,playerCard().name);
+  try{await friends.host(room.room,null,uid);onlineStatus.textContent=uid?'Party invite sent':'Party is open'}catch(e){showFriendsError(e)}
+ }else await room.host(null,playerCard().name);
 }
 $('homeRange').onclick=()=>$('rangeTab').click();
 $('inviteFriend').onclick=openFriends;
+$('multiplayer').onclick=()=>room.connected?room.beginVote():openFriends();
+$('cancelVote').onclick=()=>{
+ if(room.ballot?.[room.role]){endOnline();$('courseVote').close()}else room.cancelVote();
+};
+$('courseVote').addEventListener('cancel',event=>{event.preventDefault();room.cancelVote()});
+for(const button of document.querySelectorAll('[data-vote]'))button.onclick=()=>room.vote(button.dataset.vote);
 $('leaveParty').onclick=()=>{endOnline();refreshTags()};
-$('onlineHost').onclick=$('createParty').onclick=()=>hostParty();
+$('createParty').onclick=()=>hostParty();
 $('onlineJoin').onclick=()=>room.join($('onlineJoinCode').value,playerCard().name);
 $('onlineCopy').onclick=async()=>{const url=new URL(location.href);url.search='';url.searchParams.set('party',room.room);try{await navigator.clipboard.writeText(url.href);onlineStatus.textContent='Invite link copied'}catch{onlineStatus.textContent=url.href}};
 const inviteCode=new URL(location.href).searchParams.get('party');
