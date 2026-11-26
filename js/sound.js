@@ -1,7 +1,32 @@
-// Original synthesized sound effects; no audio files or music licenses required.
+// Recorded strike sources and editing notes are in assets/audio/CREDITS.md.
 export class SoundEngine {
- constructor(){this.ctx=null;this.enabled=false;}
- async toggle(){if(!this.ctx)this.ctx=new (window.AudioContext||window.webkitAudioContext)();await this.ctx.resume();this.enabled=!this.enabled;if(this.enabled)this.play('welcome');return this.enabled;}
+ constructor(){this.ctx=null;this.enabled=false;this.hits=new Map();this.loadingHits=null;this.puttIndex=0;}
+ async toggle(){if(!this.ctx)this.ctx=new (window.AudioContext||window.webkitAudioContext)();await this.ctx.resume();this.enabled=!this.enabled;if(this.enabled){this.loadHits();this.play('welcome')}return this.enabled;}
+ loadHits(){
+  if(this.loadingHits)return this.loadingHits;
+  const files=['drive','putt-a','putt-b'].filter(key=>!this.hits.has(key));
+  this.loadingHits=Promise.allSettled(files.map(async key=>{
+   const response=await fetch(new URL('../assets/audio/'+key+'.wav',import.meta.url));
+   if(!response.ok)throw Error('Impact audio unavailable');
+   const buffer=await this.ctx.decodeAudioData(await response.arrayBuffer());
+   this.hits.set(key,buffer);
+  })).finally(()=>{this.loadingHits=null});
+  return this.loadingHits;
+ }
+ recordedStrike(club,power,lie){
+  const putt=club==='putter',key=putt?(this.puttIndex%2?'putt-b':'putt-a'):'drive';
+  const buffer=this.hits.get(key)||(putt&&(this.hits.get('putt-a')||this.hits.get('putt-b')));
+  if(!buffer)return false;
+  if(putt)this.puttIndex++;
+  const ctx=this.ctx,source=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),gain=ctx.createGain();
+  const [pitch,cutoff,level]=({driver:[1,15500,.94],wood:[.94,9900,.85],hybrid:[.89,7200,.78],putter:[1,9500,.46]})[club]||
+   (club.startsWith('iron')?[1.07,6500,.76]:[.98,4900,.60]);
+  source.buffer=buffer;source.playbackRate.value=pitch*(.98+Math.random()*.04);
+  filter.type='lowpass';filter.Q.value=.65;filter.frequency.value=cutoff*(.55+.45*power)*(lie==='BUNKER'?.64:lie==='ROUGH'?.83:1);
+  gain.gain.value=level*(.12+.88*power**.8);
+  source.connect(filter).connect(gain).connect(ctx.destination);source.start();
+  return true;
+ }
  tone(freq,duration=.16,type='sine',gain=.055,offset=0){if(!this.enabled||!this.ctx)return;const c=this.ctx,osc=c.createOscillator(),vol=c.createGain();osc.type=type;osc.frequency.setValueAtTime(freq,c.currentTime+offset);vol.gain.setValueAtTime(.0001,c.currentTime+offset);vol.gain.exponentialRampToValueAtTime(gain,c.currentTime+offset+.015);vol.gain.exponentialRampToValueAtTime(.0001,c.currentTime+offset+duration);osc.connect(vol).connect(c.destination);osc.start(c.currentTime+offset);osc.stop(c.currentTime+offset+duration+.03)}
  // Air displaced by the head: a rising band of noise, followed by a short trailing breath.
  whoosh(club,power){
@@ -20,6 +45,7 @@ export class SoundEngine {
   this.sample(buffer);
  }
  strike(club,power,lie){
+  if(this.recordedStrike(club,power,lie))return;
   // Head-body resonance, face snap, ball compression and a delayed brush of ground.
   const wood=['driver','wood','hybrid'].includes(club),putt=club==='putter';
   const profile={driver:[720,2480,.046],wood:[580,1840,.032],hybrid:[490,1530,.026],putter:[320,950,.012]};

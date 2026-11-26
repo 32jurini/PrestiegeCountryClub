@@ -3,7 +3,7 @@ import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {lightClubs} from './club-model.js?v=wedges1';
 import * as THREE from 'three';
 import {GolfGame} from './game.js?v=clubpass';
-import {SoundEngine} from './sound.js?v=clubpass';
+import {SoundEngine} from './sound.js?v=strikefield';
 import {OnlineRoom} from './online.js?v=friends1';
 import {FriendsService,isOnline} from './friends.js?v=friends1';
 import {walletKey,wallet,catalog,itemById,award,buy,wear} from './locker.js?v=playergear1';
