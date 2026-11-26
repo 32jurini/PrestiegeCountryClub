@@ -1,5 +1,6 @@
 // One ordered data channel carries the active player's camera, pose and hole result.
 const $=id=>document.getElementById(id);
+const COURSE_HOLES=18;
 const validScore=n=>Number.isInteger(n)&&n>0&&n<10000;
 const pose=o=>[...o.position.toArray(),...o.quaternion.toArray(),...o.scale.toArray()];
 function applyPose(o,p){
@@ -25,7 +26,7 @@ export class Match {
   $('roundModal').classList.add('hidden');$('nextHole').hidden=true;
   g.golfer.root.visible=!watch;g.ball.visible=!watch;
   if(watch){g.bag.visible=false;g.shotPreview.group.visible=false;g.contactShadow.visible=false}
-  $('rivalScore').textContent=watch?'WATCHING @'+this.room.remoteName:'YOUR TURN';
+  $('rivalScore').textContent=(watch?'WATCHING @'+this.room.remoteName:'YOUR TURN')+' · HOLE '+(this.hole+1)+' OF '+COURSE_HOLES+' · '+this.standings();
   document.body.classList.toggle('watching-golf',watch);
   if(this.lobby.remote)this.lobby.remote.root.visible=false;
   this.frame=null;this.lastSend=0;
@@ -92,23 +93,37 @@ export class Match {
   this.result=true;const {host,guest}=this.card;
   const winner=host===guest?null:host<guest?'host':'guest';
   if(winner)this.points[winner]++;
-  const last=this.hole===17;
-  $('roundEyebrow').textContent='HOLE '+(this.hole+1)+' · MATCH PLAY';
-  $('roundTitle').textContent=!winner?'HOLE TIED':winner===this.room.role?'YOU WIN THE HOLE':'@'+this.room.remoteName+' WINS';
-  $('roundDescription').textContent='Player 1 · '+host+' strokes   /   Player 2 · '+guest+' strokes';
-  $('scorecard').textContent=(last?'Final match score':'Holes won')+' · Player 1: '+this.points.host+'   /   Player 2: '+this.points.guest;
-  $('nextHole').hidden=!last;$('nextHole').textContent='RETURN TO CLUBHOUSE';
+  this.complete=this.hole+1===COURSE_HOLES;
+  const title=(side,subject)=>side===null?subject+' TIED':side===this.room.role?'YOU WIN THE '+subject:'@'+this.room.remoteName+' WINS THE '+subject;
+  const courseWinner=this.points.host===this.points.guest?null:this.points.host>this.points.guest?'host':'guest';
+  $('roundEyebrow').textContent=this.complete?'COURSE COMPLETE · 18 OF 18':'HOLE '+(this.hole+1)+' OF 18 COMPLETE';
+  $('roundTitle').textContent=this.complete?title(courseWinner,'COURSE'):title(winner,'HOLE');
+  const local=this.card[this.room.role],other=this.card[this.room.role==='host'?'guest':'host'];
+  $('roundDescription').textContent='Hole '+(this.hole+1)+' strokes · You '+local+' / @'+this.room.remoteName+' '+other;
+  $('scorecard').textContent=this.standings()+(this.complete?'':' · Continuing to hole '+(this.hole+2));
+  const next=$('nextHole');
+  next.hidden=false;next.disabled=!this.complete&&this.room.role==='guest';
+  next.textContent=this.complete?'RETURN TO CLUBHOUSE':this.room.role==='host'?'CONTINUE TO HOLE '+(this.hole+2):'NEXT TEE · HOLE '+(this.hole+2);
+  $('toClubhouse').hidden=true;
   $('roundModal').classList.remove('hidden');
-  if(!last&&this.room.role==='host')this.timer=setTimeout(()=>{
-   this.send({kind:'next'});this.advance();
-  },4500);
+  if(!this.complete&&this.room.role==='host')this.timer=setTimeout(()=>this.nextHole(),4500);
+ }
+ standings(){
+  const me=this.room.role,other=me==='host'?'guest':'host';
+  return 'Holes won · You '+this.points[me]+' / @'+this.room.remoteName+' '+this.points[other];
+ }
+ nextHole(){
+  if(!this.result||this.complete||this.room.role!=='host')return;
+  this.send({kind:'next'});this.advance();
  }
  advance(){
+  if(!this.result||this.complete)return;
+  clearTimeout(this.timer);
   this.hole++;this.card={};this.result=false;this.turn='host';this.playTurn(true);
  }
  stop(){
   clearTimeout(this.timer);this.ready=false;this.game.spectating=false;this.game.ball.material.color.setHex(this.ballColor);
-  document.body.classList.remove('watching-golf');$('nextHole').hidden=false;
+  document.body.classList.remove('watching-golf');$('nextHole').hidden=false;$('nextHole').disabled=false;$('toClubhouse').hidden=false;
   const actor=this.lobby.remote;
   if(actor){this.lobby.scene.add(actor.root);actor.root.visible=true;actor.root.position.set(.79,0,-.95);actor.root.rotation.set(0,-.22,0);actor.club.visible=false;actor.animate('idle',true)}
  }
