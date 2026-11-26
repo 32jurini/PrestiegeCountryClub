@@ -61,7 +61,7 @@ export class GolfGame{
   const surface = lie === 'BUNKER' ? .68 : lie === 'ROUGH' ? .84 : 1;
   const speed = club.speed * Math.pow(power, .8) * surface;
   const velocity = this.shotDirection().multiplyScalar(speed * Math.sqrt(1 - club.loft ** 2));
-  if (this.club === 'putter') velocity.multiplyScalar(.8);
+  if (this.club === 'putter') velocity.multiplyScalar(.8 * (1 + .5 * THREE.MathUtils.smoothstep(power,.25,1)));
   velocity.y = this.club === 'putter' ? 1.2 : speed * club.loft;
   return velocity;
  }
@@ -122,7 +122,7 @@ export class GolfGame{
  }
  notify(t){$('banner').textContent=t}
  clearBag(){
-  this.waterWait=0;this.impactPending=false;this.splash.group.visible=false;
+  this.waterWait=0;this.impactPending=false;this.whooshPending=false;this.splash.group.visible=false;
   this.resetBagLift();this.bagPhase=null;this.bagLie=null;
   if(this.bag)this.bag.visible=false;
   const panel=$('bagPanel');if(panel)panel.hidden=true;
@@ -254,7 +254,7 @@ export class GolfGame{
  refresh(){const c=CLUBS[this.club];$('clubLabel').textContent=c.name;$('windLabel').textContent=`${this.wind>0?'↗':'↖'} ${Math.abs(this.wind*2.2).toFixed(0)} MPH`;$('strokeLabel').textContent=this.shots+1;const completedScore=this.scores.reduce((sum,strokes,i)=>sum+strokes-COURSES[this.course].holes[i].par,0);$('scoreLabel').textContent=completedScore===0?'E':completedScore>0?'+'+completedScore:String(completedScore);$('aimLabel').textContent=`${Math.round(this.aim)}°`;$('lieLabel').textContent=this.world.lie(this.position.x,this.position.z);$('distanceLabel').textContent=`${Math.round(this.position.distanceTo(this.world.holePosition)*1.75)} YDS TO PIN`;if(this.course==='range')$('distanceLabel').textContent='50–250 YD TARGETS';$('powerLabel').textContent=`${Math.round(this.charge*100)}%`;$('meterBar').style.width=`${this.charge*100}%`;const shapes=document.querySelector('.iron-shape');if(shapes)shapes.hidden=this.club==='putter';
  document.querySelectorAll('[data-shape]').forEach(b=>b.classList.toggle('active',Number(b.dataset.shape)===this.shotShape));this.updateShotPreview()}
  startCharge(){if(this.bagPhase||!this.started||this.swinging||this.modal||this.charging)return;this.placeGolfer();this.charging=true;this.orbit=0;this.moveCamera(0,true);this.charge=0;this.notify('HOLD SPACE FOR POWER · RELEASE TO SWING')}
- releaseShot(){if(!this.charging||this.swinging||this.modal)return;this.charging=false;const p=clamp(this.charge,.11,1);this.shots++;this.swinging=true;this.swingTimer=0;this.shotPreview.group.visible=false;this.impactPending=true;this.strikePower=p;this.cameraShotLine=this.shotDirection();this.shotOrigin=this.position.clone();this.carryYards=null;this.vel.copy(this.launchVelocity(p));this.flightShape=this.shotShape;this.impactSpin=CLUBS[this.club].isIron?CLUBS[this.club].spin:0;this.biteTimer=0;this.ballLaunchDelay=contactTime[this.shotName()];this.golfer.shot(this.shotName());this.notify(p>.74&&p<.88?'PURE STRIKE':'SHOT IN PLAY');this.refresh()}
+ releaseShot(){if(!this.charging||this.swinging||this.modal)return;this.charging=false;const p=clamp(this.charge,.11,1);this.shots++;this.swinging=true;this.swingTimer=0;this.shotPreview.group.visible=false;this.impactPending=true;this.whooshPending=true;this.strikePower=p;this.cameraShotLine=this.shotDirection();this.shotOrigin=this.position.clone();this.carryYards=null;this.vel.copy(this.launchVelocity(p));this.flightShape=this.shotShape;this.impactSpin=CLUBS[this.club].isIron?CLUBS[this.club].spin:0;this.biteTimer=0;this.ballLaunchDelay=contactTime[this.shotName()];this.golfer.shot(this.shotName());this.notify(p>.74&&p<.88?'PURE STRIKE':'SHOT IN PLAY');this.refresh()}
  update(dt){dt=Math.min(dt,.04);this.world.waterClock.value+=dt;this.splash.update(dt);this.golfer.update(dt);
   if(this.waterWait>0){
    this.waterWait=Math.max(0,this.waterWait-dt);this.moveCamera(dt);
@@ -266,7 +266,10 @@ export class GolfGame{
    return;
   }
   this.coachActor?.update(dt);if(this.bagPhase){this.updateBag(dt);return}if(this.charging){this.charge=Math.min(1,this.charge+dt*.8);this.refresh()}if(this.started){if(this.swinging){this.swingTimer+=dt;const flightTime=Math.min(dt,this.swingTimer-this.ballLaunchDelay);
-  if(flightTime>=0&&this.impactPending){this.impactPending=false;this.onSfx('strike',{club:this.club,power:this.strikePower})}
+  if(this.whooshPending&&this.swingTimer>=this.ballLaunchDelay-.16){
+   this.whooshPending=false;this.onSfx('whoosh',{club:this.club,power:this.strikePower});
+  }
+  if(flightTime>=0&&this.impactPending){this.impactPending=false;this.onSfx('strike',{club:this.club,power:this.strikePower,lie:this.world.lie(this.shotOrigin.x,this.shotOrigin.z)})}
   for(let left=flightTime;left>1e-8&&this.swinging&&!this.waterWait;left-=1/120)this.stepBall(Math.min(left,1/120))}
   if(this.swinging)this.golfer.watchFlight(this.position,this.swingTimer-this.ballLaunchDelay);
   this.moveCamera(dt)}else this.menuCamera(dt);this.updateContactShadow()}

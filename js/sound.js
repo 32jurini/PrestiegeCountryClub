@@ -3,20 +3,41 @@ export class SoundEngine {
  constructor(){this.ctx=null;this.enabled=false;}
  async toggle(){if(!this.ctx)this.ctx=new (window.AudioContext||window.webkitAudioContext)();await this.ctx.resume();this.enabled=!this.enabled;if(this.enabled)this.play('welcome');return this.enabled;}
  tone(freq,duration=.16,type='sine',gain=.055,offset=0){if(!this.enabled||!this.ctx)return;const c=this.ctx,osc=c.createOscillator(),vol=c.createGain();osc.type=type;osc.frequency.setValueAtTime(freq,c.currentTime+offset);vol.gain.setValueAtTime(.0001,c.currentTime+offset);vol.gain.exponentialRampToValueAtTime(gain,c.currentTime+offset+.015);vol.gain.exponentialRampToValueAtTime(.0001,c.currentTime+offset+duration);osc.connect(vol).connect(c.destination);osc.start(c.currentTime+offset);osc.stop(c.currentTime+offset+duration+.03)}
- // Model a short contact transient, the body of the head and its decaying resonances.
- strike(club,power){
-  const profiles={driver:[960,2380,4310,.155],wood:[810,1840,3280,.095],hybrid:[640,1490,2520,.065],putter:[390,1020,1840,.036]};
-  const [low,mid,high,decay]=profiles[club]||[735,2150,3810,.052];
-  const c=this.ctx,rate=c.sampleRate,buffer=c.createBuffer(1,Math.ceil(rate*decay*3),rate);
-  const data=buffer.getChannelData(0),variation=.96+Math.random()*.08;
-  let previous=0;
+ // Air displaced by the head: a rising band of noise, followed by a short trailing breath.
+ whoosh(club,power){
+  const c=this.ctx,rate=c.sampleRate,duration=.215;
+  const buffer=c.createBuffer(1,Math.ceil(rate*duration),rate),data=buffer.getChannelData(0);
+  const gain=(club==='putter'?.012:['driver','wood','hybrid'].includes(club)?.40:.26)*(.18+.82*power);
+  let fast=0,slow=0;
   for(let i=0;i<data.length;i++){
-   const t=i/rate,noise=Math.random()*2-1;
-   const attack=(noise-previous)*.28*Math.exp(-t/.003);
-   const ring=(.27*Math.sin(6.283*low*variation*t)*Math.exp(-t/.015)
-    +.19*Math.sin(6.283*mid*variation*t)*Math.exp(-t/decay)
-    +.12*Math.sin(6.283*high*variation*t)*Math.exp(-t/(decay*.38)));
-   data[i]=(attack+ring)*(.24+.65*power)*Math.min(1,t/.0005);previous=noise;
+   const u=i/data.length,air=Math.random()*2-1,sweep=Math.min(1,u/.72);
+   const center=400+(1100+1350*power)*sweep*sweep;
+   fast+=(air-fast)*(1-Math.exp(-2*Math.PI*center*1.9/rate));
+   slow+=(air-slow)*(1-Math.exp(-2*Math.PI*center*.45/rate));
+   const envelope=u<.72?sweep*sweep:Math.pow((1-u)/.28,2);
+   data[i]=gain*(fast-slow)*envelope;
+  }
+  this.sample(buffer);
+ }
+ strike(club,power,lie){
+  // Head-body resonance, face snap, ball compression and a delayed brush of ground.
+  const wood=['driver','wood','hybrid'].includes(club),putt=club==='putter';
+  const profile={driver:[720,2480,.046],wood:[580,1840,.032],hybrid:[490,1530,.026],putter:[320,950,.012]};
+  const [bodyHz,faceHz,tail]=profile[club]||[555,1940,.020];
+  const rate=this.ctx.sampleRate,buffer=this.ctx.createBuffer(1,Math.ceil(rate*.16),rate);
+  const data=buffer.getChannelData(0),pitch=.96+Math.random()*.08;
+  const brush=putt?0:lie==='BUNKER'?.42:lie==='ROUGH'?.27:wood?.045:.17;
+  let low=0,mid=0,previous=0;
+  for(let i=0;i<data.length;i++){
+   const t=i/rate,n=Math.random()*2-1;
+   low+=(n-low)*(1-Math.exp(-8500/rate));mid+=(n-mid)*(1-Math.exp(-31000/rate));
+   const snap=(mid-previous)*Math.exp(-t/.0032)*(putt?.25:.78);
+   const knock=(.32*Math.sin(6.283*bodyHz*pitch*t)+.55*low)*Math.exp(-t/.013);
+   const face=(.12*Math.sin(6.283*faceHz*pitch*t)+.05*Math.sin(6.283*faceHz*1.67*pitch*t))*Math.exp(-t/tail);
+   const contact=(mid-low)*Math.exp(-t/(wood?.010:.016))*.45;
+   const after=t-.009,ground=after>0?brush*low*Math.min(1,after/.005)*Math.exp(-after/.025):0;
+   data[i]=Math.tanh((snap+knock+face+contact+ground)*1.5)*(.20+.74*power)*(putt?.57:1)*Math.min(1,t/.00018);
+   previous=mid;
   }
   this.sample(buffer);
  }
@@ -29,5 +50,5 @@ export class SoundEngine {
    data[i]=(.46*smooth*Math.exp(-t/.14)+.2*Math.sin(6.283*(180*t-100*t*t))*Math.exp(-t/.046))*Math.min(1,t/.005)*Math.min(1,.35+speed/35);
   }this.sample(buffer);
  }
- play(event,detail={}){if(!this.enabled)return;switch(event){case 'strike':this.strike(detail.club,detail.power);break;case 'land':this.tone(110,.14,'sine',.05);break;case 'cup':for(let i=0;i<3;i++)this.tone([523,659,784][i],.22,'sine',.055,i*.11);break;case 'hazard':this.splash(detail.speed||12);break;case 'welcome':this.tone(440,.13,'sine',.025);this.tone(554,.18,'sine',.025,.1);break;case 'menu':this.tone(400,.045,'sine',.012);break;}}
+ play(event,detail={}){if(!this.enabled)return;switch(event){case 'whoosh':this.whoosh(detail.club,detail.power);break;case 'strike':this.strike(detail.club,detail.power,detail.lie);break;case 'land':this.tone(110,.14,'sine',.05);break;case 'cup':for(let i=0;i<3;i++)this.tone([523,659,784][i],.22,'sine',.055,i*.11);break;case 'hazard':this.splash(detail.speed||12);break;case 'welcome':this.tone(440,.13,'sine',.025);this.tone(554,.18,'sine',.025,.1);break;case 'menu':this.tone(400,.045,'sine',.012);break;}}
 }
