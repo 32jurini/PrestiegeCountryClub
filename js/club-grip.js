@@ -16,14 +16,14 @@ export function fitPalm(hand) {
  const forward = point(middle).sub(point(hand)).normalize();
  const normal = across.clone().cross(forward).normalize();
  if (normal.y > 0) normal.negate();
- const center = point(middle).lerp(point(pinky), .30).addScaledVector(normal, .014);
+ const center = point(middle).lerp(point(pinky), .30).addScaledVector(forward, -.004).addScaledVector(normal, .020);
  socket.position.copy(hand.worldToLocal(center));
  // The shaft runs diagonally across the first finger pads.
  const axis = across.addScaledVector(forward, .23).normalize().applyQuaternion(rotation(hand).invert());
  for (const digit of ['Index','Middle','Ring','Pinky','Thumb']) {
   for (let n = 1; n <= 3; n++) {
-   const bone = joint(digit+n), tip = bone?.children.find(child => child.isBone);
-   if (!tip) continue;
+   const bone = joint(digit+n), tip = joint(digit+(n+1));
+   if (!bone || !tip) continue;
    const direction = point(tip).sub(point(bone)).normalize();
    const bend = digit === 'Thumb' ? point(middle).sub(point(bone)).normalize().add(normal) : normal;
    const hinge = direction.cross(bend).normalize().applyQuaternion(rotation(bone).invert());

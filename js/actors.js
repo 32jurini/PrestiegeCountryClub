@@ -1,4 +1,4 @@
-import {fitPalm} from './club-grip.js';
+import {fitPalm} from './club-grip.js?v=curl2';
 import {clubModel,makeShaft,heelSocket} from './club-model.js?v=wedges1';
 import {loadFittedModel,fitToRig,tintGolfer} from './tour-golfer.js?v=myplay1';
 import {measureShot,contactTime} from './shot-pose.js?v=approach2';
