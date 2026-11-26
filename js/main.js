@@ -2,7 +2,7 @@ import {poloTile} from './polo-patterns.js?v=playergear1';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {lightClubs} from './club-model.js?v=wedges1';
 import * as THREE from 'three';
-import {GolfGame} from './game.js?v=clubpass';
+import {GolfGame} from './game.js?v=palm1';
 import {SoundEngine} from './sound.js?v=strikefield';
 import {OnlineRoom} from './online.js?v=friends1';
 import {FriendsService,isOnline} from './friends.js?v=friends1';

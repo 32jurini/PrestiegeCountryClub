@@ -1,3 +1,4 @@
+import {fitPalm} from './club-grip.js';
 import {clubModel,makeShaft,heelSocket} from './club-model.js?v=wedges1';
 import {loadFittedModel,fitToRig,tintGolfer} from './tour-golfer.js?v=myplay1';
 import {measureShot,contactTime} from './shot-pose.js?v=approach2';
@@ -92,6 +93,7 @@ export class Golfer{
   if(Number.isFinite(gap))this.model.position.y-=gap;
  }
  alignShot(name, ball, direction, floor, ground=null) {
+  this.club.position.set(0,0,0);
   this.ballTarget=ball.clone();this.line=direction.clone();this.faceRotation=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),Math.atan2(direction.x,direction.z));
   this.clubHead.quaternion.identity();this.fitShaft();this.stanceGround=ground;
   this.model.position.y=this.restHeight;
@@ -143,7 +145,8 @@ export class Golfer{
  }
  installModel(model,source,fitted=null){if(this.model){this.club.removeFromParent();this.root.add(this.club);this.root.remove(this.model);this.mixer?.stopAllAction()}this.watchHead=null;this.watchRotation=null;this.driveGrip=null;this.poses=new Map();this.model=model;this.model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material){const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>{m.roughness=Math.max(.42,m.roughness??.7);if(m.transparent)m.depthWrite=true})}}});const box=new THREE.Box3().setFromObject(model),size=box.getSize(new THREE.Vector3());model.scale.multiplyScalar(1.82/(size.y||1));const scaled=new THREE.Box3().setFromObject(model);model.position.y-=scaled.min.y;this.root.add(model);this.mixer=new THREE.AnimationMixer(model);this.actions.clear();this.basePose.clear();model.traverse(o=>{if(o.isBone)this.basePose.set(o,o.quaternion.clone())});this.watchHead=[...this.basePose.keys()].find(b=>/Head$/.test(b.name));this.outfit=fitted?fitToRig(this,fitted):null;const hand=model.getObjectByProperty('isBone',true) && [...this.basePose.keys()].find(b=>/RightHand$/.test(b.name));
  if(hand){
-  hand.add(this.club);
+  this.palm=fitPalm(hand);
+  this.palm.socket.add(this.club);
   this.club.position.set(0,0,0);
   const unit=hand.getWorldScale(new THREE.Vector3()).x||1;
   this.clubBaseScale=1/unit;
@@ -224,6 +227,9 @@ export class Golfer{
    const position=new THREE.Vector3();
    const height=Math.min(...this.toes.map(toe=>this.root.worldToLocal(toe.getWorldPosition(position)).y));
    this.model.position.y+=.04-height;
+  }
+  if(this.club.visible && this.palm && (this.mode==='walk' || this.carrying || ['drive','putt','chip'].includes(this.mode))) {
+   for(const {bone,closed} of this.palm.fingers)bone.quaternion.slerp(closed,this.carrying?(this.gripPressure??1):this.mode==='walk'?1:.72);
   }
   this.settleClub(this.atAddress===true);
   if(this.endAt && action && action.time>=this.endAt-.0001){

@@ -1,3 +1,4 @@
+import {reachForClub,carryClub} from './club-grip.js';
 import {WaterSplash} from './water.js?v=coast2';
 import {WEDGES,wedgeLaunch} from './wedges.js';
 import {buildBag} from './golf-bag.js?v=wedges1';
@@ -5,7 +6,7 @@ import {contactTime} from './shot-pose.js?v=approach2';
 import {CLUB_IRONS,curveAcceleration} from './irons.js?v=irons1';
 import * as THREE from 'three';
 import {World,COURSES} from './world.js?v=tour72';
-import {Golfer} from './actors.js?v=coast1';
+import {Golfer} from './actors.js?v=palm1';
 const clamp=THREE.MathUtils.clamp,$=id=>document.getElementById(id);
 const SHAPES=['HOOK','DRAW','STRAIGHT','FADE','SLICE'];
 const BAG_TAGS={driver:'Driver',wood:'3W',hybrid:'4H',pitching:'PW',approach:'AW',wedge:'SW',lob:'LW',putter:'Putter'};
@@ -123,7 +124,7 @@ export class GolfGame{
  notify(t){$('banner').textContent=t}
  clearBag(){
   this.waterWait=0;this.impactPending=false;this.whooshPending=false;this.splash.group.visible=false;
-  this.resetBagLift();this.bagPhase=null;this.bagLie=null;
+  this.golfer.carrying=false;this.resetBagLift();this.bagPhase=null;this.bagLie=null;
   if(this.bag)this.bag.visible=false;
   const panel=$('bagPanel');if(panel)panel.hidden=true;
   document.body?.classList.remove('at-bag');
@@ -149,17 +150,23 @@ export class GolfGame{
   if(!this.started||this.swinging||this.charging||this.modal||this.bagPhase)return;
   this.placeGolfer();
   this.addressPoint=this.golfer.root.position.clone();
-  this.walkTarget=this.bag.position.clone().lerp(this.addressPoint,.23);
+  const approach=this.addressPoint.clone().sub(this.bag.position).setY(0);
+  approach.clampLength(0,.40);
+  this.walkTarget=this.bag.position.clone().add(approach);
   this.bagPhase='out';this.golfer.club.visible=false;this.golfer.animate('walk',true);
   this.shotPreview.group.visible=false;this.notify('WALKING TO CLUB BAG');
   document.body?.classList.add('at-bag');
  }
  returnFromBag(id){
   if(this.bagPhase!=='select'||!CLUBS[id])return;
-  this.resetBagLift();this.club=id;if(id==='putter')this.shotShape=this.flightShape=0;
-  this.golfer.setClub(id);this.golfer.club.visible=true;this.showBagClubs(id);this.bagPhase='back';this.walkTarget=this.addressPoint;
-  $('bagPanel').hidden=true;this.golfer.animate('walk',true);
-  this.notify(CLUBS[id].name+' · RETURNING TO BALL');
+  this.club=id;if(id==='putter')this.shotShape=this.flightShape=0;
+  const head=this.bagHeads.find(item=>item.userData.club===id);
+  const shaft=head.userData.shaft;
+  this.pickPoint=shaft.getWorldPosition(new THREE.Vector3()).lerp(head.getWorldPosition(new THREE.Vector3()),.45);
+  this.pickStance=this.golfer.root.position.clone();
+  this.pickTime=0;this.bagPhase='pickup';this.golfer.setClub(id);
+  $('bagPanel').hidden=true;this.notify(CLUBS[id].name);
+
  }
  resetBagLift(){
   this.hoverClub=null;
@@ -225,7 +232,36 @@ export class GolfGame{
  }
  updateBag(dt){
   const root=this.golfer.root,spot=this.bag.position;
-  if(this.bagPhase!=='select'){
+  if(this.bagPhase==='pickup'){
+   const golfer=this.golfer;
+   this.pickTime+=dt;
+   const reach=THREE.MathUtils.smoothstep(this.pickTime,0,.36);
+   const release=THREE.MathUtils.smoothstep(this.pickTime,.48,1.12);
+   root.position.copy(this.pickStance);
+   const weight=reach*(1-release);
+   reachForClub(golfer.palm,this.pickPoint,weight);
+   if(golfer.palm?.arm){
+    // Shift weight toward the selected slot, including clubs on the far side.
+    const gap=this.pickPoint.clone().sub(golfer.palm.socket.getWorldPosition(new THREE.Vector3()));
+    root.position.x+=gap.x*weight;root.position.z+=gap.z*weight;
+    root.position.y=this.world.ground(root.position.x,root.position.z);
+    reachForClub(golfer.palm,this.pickPoint,weight);
+   }
+   if(this.pickTime>=.36){
+    if(!golfer.carrying){
+     const localUp=new THREE.Vector3(0,1,0).applyQuaternion(golfer.club.parent.getWorldQuaternion(new THREE.Quaternion()).invert());
+     this.upright=new THREE.Quaternion().setFromUnitVectors(golfer.shaftAxis,localUp);
+     golfer.club.scale.setScalar(golfer.clubBaseScale||1);
+     this.showBagClubs(this.club);golfer.club.visible=true;golfer.carrying=true;
+    }
+    carryClub(golfer,release,this.upright);
+    golfer.gripPressure=THREE.MathUtils.lerp(.35,1,THREE.MathUtils.smoothstep(this.pickTime,.36,.46))
+      -.28*Math.sin(release*Math.PI);
+   }
+   if(this.pickTime>=1.12){
+    this.resetBagLift();this.walkTarget=this.addressPoint;this.bagPhase='back';golfer.animate('walk',true);
+   }
+  }else if(this.bagPhase!=='select'){
    const dx=this.walkTarget.x-root.position.x,dz=this.walkTarget.z-root.position.z;
    const distance=Math.hypot(dx,dz),step=Math.min(distance,dt*1.45);
    if(distance>.001){
@@ -234,7 +270,7 @@ export class GolfGame{
    }
    if(distance<=step+.001){
     if(this.bagPhase==='back'){
-     this.bagPhase=null;document.body?.classList.remove('at-bag');this.chooseClub(this.club);
+     this.golfer.carrying=false;this.bagPhase=null;document.body?.classList.remove('at-bag');this.chooseClub(this.club);
      this.moveCamera(0,true);this.notify('ADDRESS THE BALL');return;
     }
     this.bagPhase='select';this.showBagClubs(null);root.rotation.y=Math.atan2(spot.x-root.position.x,spot.z-root.position.z);
