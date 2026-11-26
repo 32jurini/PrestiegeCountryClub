@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import {GolfGame} from './game.js?v=curl2';
 import {SoundEngine} from './sound.js?v=strikefield';
 import {OnlineRoom} from './online.js?v=vote1';
-import {FriendsService,isOnline} from './friends.js?v=lobby1';
+import {FriendsService,isOnline} from './friends.js?v=invite2';
 import {walletKey,wallet,catalog,itemById,award,buy,wear} from './locker.js?v=playergear1';
 const $=id=>document.getElementById(id);
 const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(window.devicePixelRatio,1.6));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;$('viewport').appendChild(renderer.domElement);
@@ -152,8 +152,38 @@ function refreshTags(){
  $('heroPlay').hidden=party;
  $('onlineJoin').disabled=$('createParty').disabled=party;
  $('multiplayer').querySelector('span').textContent=party?'Vote for course →':'Party play →';
- $('inviteDot').hidden=!friends.friends.some(f=>f.hosting&&f.invited===friends.user?.uid&&isOnline(f)&&!party);
+ refreshInvite();
+
 }
+let displayedInvite=null,replyBusy=false,joiningInvite=false,inviteTimer;
+function refreshInvite(){
+ clearTimeout(inviteTimer);
+ const incoming=friends.friends.find(friend=>friends.pendingInvite(friend));
+ displayedInvite=!room.connected&&!joiningInvite?incoming:null;
+ $('inviteDot').hidden=!displayedInvite;
+ $('partyPrompt').hidden=!displayedInvite;
+ if(!displayedInvite)return;
+ $('partyMessage').textContent='@'+displayedInvite.username+' invited you to their party.'+(page==='playing'?' Joining leaves this round.':'');
+ $('partyJoin').disabled=$('partyDecline').disabled=replyBusy;
+ inviteTimer=setTimeout(refreshInvite,Math.max(1,displayedInvite.inviteTime.toMillis()+120000-Date.now()));
+}
+async function answerInvite(join){
+ const invite=displayedInvite;
+ if(replyBusy||!invite)return;
+ replyBusy=true;refreshInvite();
+ try{
+  const accepted=await friends.reply(invite,join?'joined':'declined');
+  if(join&&accepted){
+   joiningInvite=true;
+   if(room.role==='host')await friends.unhost();
+   onlinePanel.classList.remove('hidden');
+   await room.join(invite.hosting,playerCard().name);
+  }
+ }catch(error){onlinePanel.classList.remove('hidden');showFriendsError(error)}
+ finally{replyBusy=false;refreshInvite()}
+}
+$('partyJoin').onclick=()=>answerInvite(true);
+$('partyDecline').onclick=()=>answerInvite(false);
 const friends=new FriendsService(()=>renderFriends());
 const room=new OnlineRoom({
  profile:playerCard,
@@ -172,11 +202,11 @@ const room=new OnlineRoom({
  onParty:(profile,joined)=>{
   const colors={};for(const key of Object.keys(palette()))if(/^#[0-9a-f]{6}$/i.test(profile.colors?.[key]))colors[key]=profile.colors[key];
   lobby.member({name:room.remoteName,frame:profile.frame==='female'?'female':'male',colors,pattern:profile.pattern}).catch(showFriendsError);
-  if(joined){onlinePanel.classList.add('hidden');if(page!=='home')showPage('home');if(room.role==='host')friends.unhost().catch(showFriendsError)}
-  refreshTags();
+  if(joined){joiningInvite=false;onlinePanel.classList.add('hidden');if(page!=='home')showPage('home');if(room.role==='host')friends.unhost().catch(showFriendsError)}
+  renderFriends();
  },
- onHosted:(code,course)=>friends.host(code,course,inviteTo).then(()=>{onlineStatus.textContent=inviteTo?'Party invitation sent. Your friend can accept it in Friends.':'Party open. Share the invite link or code.'}).catch(err=>onlineStatus.textContent=err.message),
- onStatus:message=>{refreshTags();onlineCode.hidden=$('onlineCopy').hidden=room.role!=='host'||!room.room;onlineStatus.textContent=message;onlineCode.textContent=room.role==='host'&&room.room?'ROOM CODE: '+room.room:'';},
+ onHosted:(code,course)=>friends.host(code,course,inviteTo).then(()=>{onlineStatus.textContent=inviteTo?'Party invite sent.':'Party open. Share the invite link or code.'}).catch(err=>onlineStatus.textContent=err.message),
+ onStatus:message=>{if(!room.room||message.startsWith('Connection failed')||message.startsWith('Cannot join'))joiningInvite=false;refreshTags();onlineCode.hidden=$('onlineCopy').hidden=room.role!=='host'||!room.room;onlineStatus.textContent=message;onlineCode.textContent=room.role==='host'&&room.room?'ROOM CODE: '+room.room:'';},
  onStart:async(course,opponent)=>{
   onlineActive=true;remoteState=null;ghost.visible=false;onlinePanel.classList.add('hidden');
   $('rivalName').textContent=opponent.toUpperCase();rivalStats.hidden=false;
@@ -191,7 +221,7 @@ const room=new OnlineRoom({
   const total=(Array.isArray(state.scores)?state.scores:[]).reduce((a,b)=>a+(Number(b)||0),0);
   $('rivalScore').textContent='HOLE '+(Number(state.hole)+1)+' · '+Number(state.strokes)+' SHOTS · '+total+' FINISHED';
  },
- onDisconnect:()=>{lobby.member(null);refreshTags();ghost.visible=false;if(onlineActive){$('rivalScore').textContent='FRIEND DISCONNECTED';onlineActive=false}}
+ onDisconnect:()=>{joiningInvite=false;lobby.member(null);renderFriends();ghost.visible=false;if(onlineActive){$('rivalScore').textContent='FRIEND DISCONNECTED';onlineActive=false}}
 });
 function endOnline(){onlineActive=false;remoteState=null;ghost.visible=false;ghost.userData.initialized=false;rivalStats.hidden=true;room.close();friends.unhost().catch(()=>{})}
 function renderFriends(){
@@ -213,10 +243,14 @@ function renderFriends(){
   const item=document.createElement('div');item.className='friend-row';
   const name=document.createElement('span');name.textContent='@'+friend.username+' · '+(isOnline(friend)?friend.hosting?'IN LOBBY':'ONLINE':'OFFLINE');
   item.append(name);
-  if(!room.connected&&(!room.role||room.role==='host')&&isOnline(friend)){
-   const invite=document.createElement('button');invite.textContent='INVITE';invite.onclick=()=>hostParty(friend.uid);item.append(invite);
+  if(!room.connected&&!joiningInvite){
+   const invite=document.createElement('button');const outgoing=friends.profile.invited===friend.uid&&friends.profile.hosting===room.room&&room.room&&room.role==='host'&&Date.now()-friends.profile.inviteTime?.toMillis?.()<120000;
+   const declined=outgoing&&friend.partyReplies?.[friends.user.uid]?.id===friends.profile.inviteId&&friend.partyReplies[friends.user.uid].answer==='declined';
+   invite.textContent=declined?'Invite again':outgoing?'Invite sent':'Invite to party';invite.disabled=!!outgoing&&!declined;
+   if(declined)name.textContent+=' · Declined';
+   invite.onclick=()=>hostParty(friend.uid);item.append(invite);
   }
-  if(!room.connected&&friend.hosting&&isOnline(friend)&&(!friend.invited||friend.invited===friends.user.uid)){
+  if(!room.connected&&friend.hosting&&isOnline(friend)&&!friend.invited){
    const join=document.createElement('button');join.textContent=friend.invited?'ACCEPT INVITE':'JOIN PARTY';
    join.onclick=()=>room.join(friend.hosting,friends.profile.username);
    item.append(join);
@@ -245,6 +279,7 @@ function connectFriends(){
 async function hostParty(uid=null){
  if(room.connected)return;
  inviteTo=uid;
+ if(room.role==='host'&&!room.peer?.open&&room.peer&&!room.peer.destroyed&&!room.peer.disconnected)return;
  if(room.role==='host'&&room.peer?.open){
   try{await friends.host(room.room,null,uid);onlineStatus.textContent=uid?'Party invite sent':'Party is open'}catch(e){showFriendsError(e)}
  }else await room.host(null,playerCard().name);
@@ -262,7 +297,7 @@ $('createParty').onclick=()=>hostParty();
 $('onlineJoin').onclick=()=>room.join($('onlineJoinCode').value,playerCard().name);
 $('onlineCopy').onclick=async()=>{const url=new URL(location.href);url.search='';url.searchParams.set('party',room.room);try{await navigator.clipboard.writeText(url.href);onlineStatus.textContent='Invite link copied'}catch{onlineStatus.textContent=url.href}};
 const inviteCode=new URL(location.href).searchParams.get('party');
-if(/^[A-Z0-9]{6}$/i.test(inviteCode||'')){$('onlineJoinCode').value=inviteCode;onlinePanel.classList.remove('hidden');onlineStatus.textContent='You have a clubhouse invitation. Select Join Party.'}
+if(/^[A-Z0-9]{6}$/i.test(inviteCode||'')){$('inviteOptions').open=true;$('onlineJoinCode').value=inviteCode;onlinePanel.classList.remove('hidden');onlineStatus.textContent='You have a clubhouse invitation. Select Join Party.'}
 const sunOffset=new THREE.Vector3(-39,53,27);
 function loop(){requestAnimationFrame(loop);const dt=Math.min(game.clock.getDelta(),.05);if(page==='home'){lobby.draw(renderer,dt);return}game.update(dt);if(onlineActive&&room.connected&&game.started&&performance.now()-lastSent>110){lastSent=performance.now();room.send(room.snapshot(game))}if(ghost.visible)ghost.position.lerp(remoteTarget,Math.min(1,dt*13));const course=game.world.current;
  if(sun.userData.course!==course){

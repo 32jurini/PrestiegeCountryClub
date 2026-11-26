@@ -94,9 +94,24 @@ export class FriendsService {
    if(snap.exists())this.friends.push({uid,...snap.data()});this.emit();
   }));
  }
+ pendingInvite(friend){
+  if(!friend || friend.invited!==this.user?.uid || !friend.hosting || !friend.inviteId)return false;
+  const issued=friend.inviteTime?.toMillis?.();
+  return Date.now()-issued<120000 && this.profile?.partyReplies?.[friend.uid]?.id!==friend.inviteId;
+ }
+ async reply(friend,answer){
+  if(!this.pendingInvite(friend))return false;
+  const field=new this.api.FieldPath('partyReplies',friend.uid);
+  await this.api.updateDoc(this.api.doc(this.db,'players',this.user.uid),field,{id:friend.inviteId,answer});
+  return true;
+ }
  async host(code,course,invited=null){
   if(!this.profile?.username)return;
-  await this.api.updateDoc(this.api.doc(this.db,'players',this.user.uid),{hosting:code,course,invited,lastSeen:this.api.serverTimestamp()});
+  if(invited && !this.profile.friends.includes(invited))throw Error('Add this golfer as a friend first.');
+  await this.api.updateDoc(this.api.doc(this.db,'players',this.user.uid),{
+   hosting:code,course,invited,inviteId:invited?crypto.randomUUID():null,
+   inviteTime:invited?this.api.serverTimestamp():null,lastSeen:this.api.serverTimestamp()
+  });
  }
  async unhost(){
   if(!this.profile?.username)return;
