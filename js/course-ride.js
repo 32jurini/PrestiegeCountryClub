@@ -1,0 +1,156 @@
+import * as T from 'three';
+import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
+import {clone} from 'three/addons/utils/SkeletonUtils.js';
+import {World} from './world.js?v=cart1';
+
+const v=(x=0,y=0,z=0)=>new T.Vector3(x,y,z);
+const ease=t=>t*t*(3-2*t);
+const themes={royal:[44,10,0x194638],ocean:[54,-12,0x296474],summit:[52,15,0x343e37],misty:[61,-16,0x514754]};
+
+function clip(world,plane){
+ world.root.traverse(o=>{
+  if(o===world.sky||!o.material)return;
+  for(const m of [].concat(o.material)){m.clippingPlanes=[plane];m.clipShadows=true}
+ });
+}
+
+// Seat the fitted character using bone directions in cart space. The live swing rig stays independent.
+function rider(actor,passenger,owned){
+ const figure=clone(actor.model),source=[],copies=[];
+ actor.model.traverse(o=>source.push(o));figure.traverse(o=>copies.push(o));
+ figure.position.set(0,0,0);figure.quaternion.identity();
+ const bones=new Map();
+ copies.forEach((o,i)=>{
+  if(o.isBone){
+   const rest=actor.basePose.get(source[i]);if(rest)o.quaternion.copy(rest);
+   const name=o.name.replace(/^mixamorig\d*[:_]?/,'');if(!bones.has(name))bones.set(name,o);
+  }
+  if(passenger&&Array.isArray(o.material)&&o.material.includes(actor.outfit?.shirt)){
+   const mats=o.material.slice(),idx=mats.indexOf(actor.outfit.shirt);
+   mats[idx]=mats[idx].clone();mats[idx].color.setHex(0xe7deb9);owned.push(mats[idx]);o.material=mats;
+  }
+ });
+ // The hand-mounted club is also a child of the animated model.
+
+ const held=source.indexOf(actor.club);if(held>=0)copies[held].visible=false;
+ function point(from,to,direction){
+  const a=bones.get(from),b=bones.get(to);if(!a||!b)return;
+  const cur=b.getWorldPosition(v()).sub(a.getWorldPosition(v())).normalize();
+  const q=a.getWorldQuaternion(new T.Quaternion()).premultiply(new T.Quaternion().setFromUnitVectors(cur,direction.normalize()));
+  a.quaternion.copy(a.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(q));
+ }
+ for(const [s,k] of [['Left',1],['Right',-1]]){
+  point(s+'UpLeg',s+'Leg',v(k*.10,-.12,1));point(s+'Leg',s+'Foot',v(0,-1,.20));
+  point(s+'Arm',s+'ForeArm',v(k*.26,-.84,.45));point(s+'ForeArm',s+'Hand',passenger?v(k*.12,.3,.9):v(-k*.22,.16,1));
+ }
+ const hip=bones.get('Hips');if(hip)figure.position.sub(hip.getWorldPosition(v()));
+ const seat=new T.Group();seat.add(figure);return {seat,hand:bones.get('RightHand')};
+}
+
+function cart(game){
+ const root=new T.Group(),owned=[];
+ const part=(geo,color,x,y,z)=>{
+  const mat=new T.MeshStandardMaterial({color,roughness:.68});owned.push(mat,geo);
+  const m=new T.Mesh(geo,mat);m.position.set(x,y,z);m.castShadow=true;root.add(m);return m;
+ };
+ const box=(x,y,z,w,h,d,c)=>part(new RoundedBoxGeometry(w,h,d,2,Math.min(.075,h*.34,w*.25,d*.25)),c,x,y,z);
+ const color=themes[game.course][2];
+ box(0,.40,0,1.7,.19,2.55,color);box(0,.78,.91,1.67,.48,.55,color);
+ box(0,.68,-.38,1.48,.19,.62,0xdcd5be);box(0,.96,-.71,1.49,.42,.12,0xdcd5be);
+ for(const x of [-.77,.77])for(const z of [-.86,.89]){
+  box(x,1.37,z,.055,1.82,.055,0x27332e);
+  const tire=part(new T.CylinderGeometry(.30,.30,.19,20),0x242927,x,.32,z);tire.rotation.z=Math.PI/2;
+  const hub=part(new T.CylinderGeometry(.15,.15,.2,16),0xaaafa6,x,.32,z);hub.rotation.z=Math.PI/2;
+ }
+ box(0,2.3,0,1.89,.12,2.4,0xe4dfcb);
+ box(0,.56,-1.04,1.60,.29,.44,color);box(0,.38,-1.29,1.54,.10,.12,0x292e2c);
+ for(const x of [-.59,.59]){
+  box(x,.60,-1.262,.22,.09,.026,0x9a2921);box(x,.87,1.194,.26,.11,.03,0xeae2c7);
+  box(x,.47,.02,.34,.09,1.08,0x3c423d);
+ }
+ const glass=box(0,1.52,.91,1.47,.89,.025,0xcbdedb);
+ glass.material.transparent=true;glass.material.opacity=.14;glass.material.depthWrite=false;glass.castShadow=false;
+ const wheel=part(new T.TorusGeometry(.20,.023,8,28),0x252d29,-.40,1.07,.40);wheel.rotation.x=-.65;
+ box(-.4,.89,.51,.055,.38,.055,0x303532).rotation.x=-.45;
+ const driver=rider(game.golfer,false,owned),caddie=rider(game.golfer,true,owned);
+ for(const [person,x] of [[driver,-.4],[caddie,.4]]){root.add(person.seat);person.seat.position.set(x,.83,-.42)}
+ const bag=game.bag;root.add(bag);bag.visible=true;game.showBagClubs(null);
+ const hand=caddie.hand?.getWorldPosition(v())??v(.52,1.1,.13);
+ bag.position.copy(hand).add(v(.08,-.57,.09));bag.rotation.z=-.15;
+ game.scene.add(root);
+ return {root,dispose(){
+  game.scene.add(bag);bag.rotation.set(0,0,0);bag.visible=false;root.removeFromParent();owned.forEach(o=>o.dispose());
+  root.traverse(o=>{if(o.isSkinnedMesh)o.skeleton.dispose()});
+ }};
+}
+
+export class CourseRide{
+ constructor(g,index){
+  this.game=g;this.from=g.world;this.to=new World(g.scene,g.course,index,this.from);
+  const [distance,bend]=themes[g.course],pin=this.from.holePosition;
+  const side=g.course==='ocean'?-1:(index%2?1:-1);
+  const spread=distance+5*Math.sin(index*1.91),dx=side*(8+Math.abs(bend)*.6);
+  this.offset=v(pin.x+dx,0,pin.z-spread-70);this.seam=pin.z-spread*.5;
+  const center=pin.x+dx*.52;
+  this.offset.y=this.from.groundHeight(center,this.seam)-this.to.groundHeight(center-this.offset.x,this.seam-this.offset.z);
+  this.to.root.position.copy(this.offset);this.to.sky.visible=false;
+  this.before=new T.Plane(v(0,0,1),-this.seam);this.after=new T.Plane(v(0,0,-1),this.seam);
+  clip(this.from,this.before);clip(this.to,this.after);
+  // Grade both terrain meshes to the same cross-section behind the green.
+  for(const world of [this.from,this.to]){
+   const shift=world.root.position,geo=world.terrain.geometry,pts=geo.attributes.position;
+   for(let i=0;i<pts.count;i++){
+    const z=pts.getZ(i)+shift.z;
+    if(Math.abs(z-this.seam)<10)pts.setY(i,this.grade(pts.getX(i)+shift.x,z)-shift.y);
+   }
+   pts.needsUpdate=true;geo.computeVertexNormals();geo.computeBoundingSphere();
+  }
+  this.curve=new T.CatmullRomCurve3([v(pin.x+side*(this.from.green.rx+3),0,pin.z),v(pin.x+side*(this.from.green.rx+3),0,pin.z-10),
+   v(center+bend*.35,0,this.seam),v(this.offset.x+side*6,0,this.offset.z+80),v(this.offset.x+side*8.6,0,this.offset.z+71)]);
+  this.length=this.curve.getLength();this.distance=0;this.speed=0;
+  const vertices=[],indices=[],colors=[];
+  const gravel=new T.Color(g.course==='ocean'?0xc3b897:0xa39d88);
+  for(let i=0;i<=96;i++){
+   const t=i/96,p=this.curve.getPointAt(t),d=this.curve.getTangentAt(t);
+   for(const [k,shade] of [[-1.35,.67],[-1.16,.86],[-.80,1.04],[-.51,1],[.51,1],[.80,1.04],[1.16,.86],[1.35,.67]]){
+    const x=p.x+d.z*k,z=p.z-d.x*k;
+    vertices.push(x,this.height(x,z)+.025,z);colors.push(gravel.r*shade,gravel.g*shade,gravel.b*shade);
+   }
+   if(i)for(let k=0;k<7;k++){const a=i*8+k;indices.push(a-8,a,a-7,a-7,a,a+1)}
+  }
+  const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(vertices,3));geo.setAttribute('color',new T.Float32BufferAttribute(colors,3));geo.setIndex(indices);geo.computeVertexNormals();
+  this.road=new T.Mesh(geo,new T.MeshStandardMaterial({vertexColors:true,roughness:1,side:T.DoubleSide}));
+  this.road.receiveShadow=true;g.scene.add(this.road);
+ }
+ board(){
+  const g=this.game;this.cart=cart(g);this.origin=g.camera.position.clone();this.initialRotation=g.camera.quaternion.clone();this.elapsed=0;
+ }
+ grade(x,z){
+  const a=this.from.groundHeight(x,z),b=this.to.groundHeight(x-this.offset.x,z-this.offset.z)+this.offset.y;
+  const t=ease(T.MathUtils.clamp((this.seam+9-z)/18,0,1));
+  return T.MathUtils.lerp(a,b,t);
+ }
+ height(x,z){return this.grade(x,z)+.085}
+ update(dt){
+  this.elapsed+=dt;const g=this.game;
+  const speed=Math.min(g.cartBoost?11:6.7,Math.sqrt(7*(this.length-this.distance))+.65);
+  this.speed=T.MathUtils.damp(this.speed,speed,2,dt);this.distance=Math.min(this.length,this.distance+dt*this.speed);
+  const t=this.distance/this.length,p=this.curve.getPointAt(t),dir=this.curve.getTangentAt(t);
+  this.lane=T.MathUtils.damp(this.lane||0,(Number(!!g.cartRight)-Number(!!g.cartLeft))*.43,4,dt);
+  p.x-=dir.z*this.lane;p.z+=dir.x*this.lane;
+  p.y=this.height(p.x,p.z);this.cart.root.position.copy(p);this.cart.root.rotation.y=Math.atan2(dir.x,dir.z);
+  const eye=this.cart.root.localToWorld(v(-2.6,2.42,-4.25)),focus=this.cart.root.localToWorld(v(0,1,.9));
+  eye.y=Math.max(eye.y,this.height(eye.x,eye.z)+1.4);
+  const blend=ease(Math.min(1,this.elapsed/1.1));g.camera.position.lerpVectors(this.origin,eye,blend);
+  g.camera.lookAt(focus);g.camera.quaternion.slerp(this.initialRotation,1-blend);g.position.copy(p);
+  return this.distance>=this.length;
+ }
+ arrive(){
+  // Rebase both sectors and the camera together so shot physics can keep tee-local coordinates.
+  this.to.root.position.set(0,0,0);this.from.root.position.sub(this.offset);this.road.position.sub(this.offset);
+  this.before.constant+=this.offset.z;this.after.constant-=this.offset.z;
+  this.to.sky.visible=true;this.from.sky.visible=false;this.game.camera.position.sub(this.offset);
+  this.cart.dispose();this.cart=null;
+ }
+ releaseRoad(){this.road.removeFromParent();this.road.geometry.dispose();this.road.material.dispose()}
+}

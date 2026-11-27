@@ -5,7 +5,8 @@ import {buildBag} from './golf-bag.js?v=wedges1';
 import {contactTime} from './shot-pose.js?v=approach2';
 import {CLUB_IRONS,curveAcceleration} from './irons.js?v=irons1';
 import * as THREE from 'three';
-import {World,COURSES} from './world.js?v=tour72';
+import {CourseRide} from './course-ride.js?v=cart1';
+import {World,COURSES} from './world.js?v=cart1';
 import {Golfer} from './actors.js?v=portrait1';
 const clamp=THREE.MathUtils.clamp,$=id=>document.getElementById(id);
 const SHAPES=['HOOK','DRAW','STRAIGHT','FADE','SLICE'];
@@ -13,6 +14,7 @@ const BAG_TAGS={driver:'Driver',wood:'3W',hybrid:'4H',pitching:'PW',approach:'AW
 const BALL_RADIUS = .02135;
 const CLUBS={driver:{name:'DRIVER',speed:43,loft:.395,range:255},wood:{name:'3 WOOD',speed:39.8,loft:.42,range:228},hybrid:{name:'4 HYBRID',speed:42.2,loft:.315,range:191},...CLUB_IRONS,
  ...WEDGES,putter:{name:'PUTTER',speed:11,loft:.015,range:35}};
+const cartKeys={KeyW:'cartBoost',ArrowUp:'cartBoost',KeyA:'cartLeft',ArrowLeft:'cartLeft',KeyD:'cartRight',ArrowRight:'cartRight'};
 export class GolfGame{
  constructor(renderer,scene,camera){this.renderer=renderer;this.scene=scene;this.camera=camera;this.world=new World(scene);this.golfer=new Golfer(scene);this.ball=this.makeBall();this.tee=this.makeTee();this.splash=new WaterSplash(scene);this.contactShadow=this.makeContactShadow();this.clock=new THREE.Clock();this.position=new THREE.Vector3();this.vel=new THREE.Vector3();this.swinging=false;this.swingTimer=0;this.ballLaunchDelay=.9;this.charge=0;this.charging=false;this.shots=0;this.scores=[];this.course='royal';this.index=0;this.started=false;this.aim=0;this.club='driver';this.lastIron='iron7';this.shotShape=0;this.flightShape=0;this.impactSpin=0;this.biteTimer=0;this.wind=0;this.modal=false;this.cameraTarget=new THREE.Vector3();this.dragging=false;this.dragStart=0;this.orbit=0;this.coachActor=null;this.onSfx=()=>{};this.shotPreview=this.createShotPreview();const gear=buildBag();this.bag=gear.bag;this.bagHeads=gear.heads;scene.add(this.bag);
  this.bagPhase=null;this.listeners();this.enterMenu()}
@@ -114,9 +116,9 @@ export class GolfGame{
   const carry = Math.round(Math.hypot(point.x-this.position.x,point.z-this.position.z)*1.75);
   $('shotPreviewText').textContent = CLUBS[this.club].name + (WEDGES[this.club]?' '+WEDGES[this.club].degrees+'°':'') + ' · ' + carry + ' YDS CARRY · ' + SHAPES[this.shotShape+2] + ' · ' + Math.round(this.aim) + '° AIM';
  }
- enterMenu(){this.placing=false;this.tee.visible=false;this.clearBag();this.started=false;this.previewMode=false;this.shotPreview.group.visible=false;this.world.create('royal',0);this.ball.visible=false;this.golfer.setVisible(false);this.coachActor?.setVisible(false);this.camera.position.set(39,37,110);this.camera.lookAt(-4,3,-45)}
+ enterMenu(){this.clearCourseRide();this.placing=false;this.tee.visible=false;this.clearBag();this.started=false;this.previewMode=false;this.shotPreview.group.visible=false;this.world.create('royal',0);this.ball.visible=false;this.golfer.setVisible(false);this.coachActor?.setVisible(false);this.camera.position.set(39,37,110);this.camera.lookAt(-4,3,-45)}
  enterPreview(){this.golfer.stanceGround=null;this.previewMode=true;this.golfer.club.visible=false;this.golfer.setVisible(true);this.golfer.root.position.set(0,this.world.ground(0,67),67);this.golfer.root.rotation.set(0,0,0);this.menuCamera(1);this.golfer.animate('idle',true)}
- async begin(course='royal',tutorial=false){await this.golferReady;this.tutorial=tutorial;this.course=course;this.roundId=crypto.randomUUID();this.scores=[];if(tutorial)await this.loadCoach();this.startHole(0);if(tutorial){this.coachActor?.setVisible(true);this.positionCoach()}}
+ async begin(course='royal',tutorial=false){await this.golferReady;this.clearCourseRide();this.tutorial=tutorial;this.course=course;this.roundId=crypto.randomUUID();this.scores=[];if(tutorial)await this.loadCoach();this.startHole(0);if(tutorial){this.coachActor?.setVisible(true);this.positionCoach()}}
  resetBallToTee() {
   this.position.copy(this.world.teePosition);
   this.position.y = this.world.ground(this.position.x, this.position.z) + BALL_RADIUS + .055;
@@ -124,7 +126,36 @@ export class GolfGame{
   this.tee.visible=true;
   this.ball.position.copy(this.position);
  }
- startHole(index){this.clearBag();this.index=index;this.world.create(this.course,index);const hole=this.world.hole;this.ball.visible=true;this.resetBallToTee();this.vel.set(0,0,0);this.swinging=false;this.charging=false;this.swingTimer=0;this.charge=0;this.shots=0;this.aim=0;this.club=this.course==='misty'&&index===1?'iron9':'driver';this.shotShape=0;this.flightShape=0;this.biteTimer=0;this.wind=(Math.random()-.5)*COURSES[this.course].wind*.5;this.started=true;this.modal=false;this.golfer.setVisible(true);this.placeGolfer();this.golfer.setClub(this.club);this.golfer.onShotEnd=()=>{if(this.started&&!this.swinging&&!this.modal&&!this.bagPhase)this.placeGolfer()};this.placeGolfer('tee');this.golfer.shot('tee');this.placing=true;
+ clearCourseRide(){
+  if(this.upcomingRide){this.upcomingRide.to.disposeSector();this.upcomingRide.releaseRoad();this.upcomingRide=null}
+  if(this.ride){this.ride.cart.dispose();this.ride.to.disposeSector();this.ride.releaseRoad();this.ride=null}
+  if(this.previousRide){this.previousRide.from.disposeSector();this.previousRide.releaseRoad();this.previousRide=null}
+  this.cartLeft=this.cartRight=this.cartBoost=false;this.arrivalView=null;document.body.classList.remove('cart-ride');
+ }
+ prepareNextTee(){
+  if(this.upcomingRide||this.ride||this.course==='range'||this.index+1>=COURSES[this.course].holes.length)return;
+  if(this.previousRide){this.previousRide.from.disposeSector();this.previousRide.releaseRoad();this.previousRide=null}
+  this.upcomingRide=new CourseRide(this,this.index+1);
+ }
+ driveTo(index,onArrival){
+  if(this.ride||index!==this.index+1||index>=COURSES[this.course].holes.length)return;
+  this.prepareNextTee();this.clearBag();this.modal=true;this.placing=false;
+  this.ball.visible=this.tee.visible=this.contactShadow.visible=this.shotPreview.group.visible=false;
+  this.golfer.setVisible(false);this.coachActor?.setVisible(false);
+  this.ride=this.upcomingRide;this.upcomingRide=null;this.ride.board();this.ride.onArrival=onArrival;
+  document.body.classList.add('cart-ride');$('roundModal').classList.add('hidden');
+  this.notify('CART PATH · TEE '+(index+1)+' · '+COURSES[this.course].holes[index].name.toUpperCase());
+ }
+ updateRide(dt){
+  const ride=this.ride;this.world.waterClock.value+=dt;ride.to.waterClock.value+=dt;
+  if(!ride.update(dt))return;
+  ride.arrive();this.world=ride.to;this.previousRide=ride;this.ride=null;this.cartLeft=this.cartRight=this.cartBoost=false;
+  document.body.classList.remove('cart-ride');
+  const eye=this.camera.position.clone(),rotation=this.camera.quaternion.clone();
+  this.startHole(this.index+1,true);this.arrivalView={eye,rotation,time:0};
+  ride.onArrival?.();
+ }
+ startHole(index,prepared=false){this.arrivalView=null;this.clearBag();this.index=index;if(!prepared&&(this.world.current!==this.course||this.world.holeIndex!==index)){this.clearCourseRide();this.world.create(this.course,index)}const hole=this.world.hole;this.ball.visible=true;this.resetBallToTee();this.vel.set(0,0,0);this.swinging=false;this.charging=false;this.swingTimer=0;this.charge=0;this.shots=0;this.aim=0;this.club=this.course==='misty'&&index===1?'iron9':'driver';this.shotShape=0;this.flightShape=0;this.biteTimer=0;this.wind=(Math.random()-.5)*COURSES[this.course].wind*.5;this.started=true;this.modal=false;this.golfer.setVisible(true);this.placeGolfer();this.golfer.setClub(this.club);this.golfer.onShotEnd=()=>{if(this.started&&!this.swinging&&!this.modal&&!this.bagPhase)this.placeGolfer()};this.placeGolfer('tee');this.golfer.shot('tee');this.placing=true;
   this.placementFinger=[...this.golfer.basePose.keys()].find(b=>b.name.endsWith('RightHandIndex3'));
   this.updatePlacement();this.orbit=0;this.moveCamera(0,true);if(this.coachActor){this.coachActor.setVisible(!!this.tutorial);this.positionCoach()}$('roundModal').classList.add('hidden');$('courseLabel').textContent=COURSES[this.course].name;$('holeLabel').textContent=`HOLE ${String(index+1).padStart(2,'0')} · ${hole.name.toUpperCase()}`;$('parLabel').textContent=hole.par;const range=this.course==='range';
   const stats=document.querySelector('.hole-stat');if(stats)stats.style.display=range?'none':'';
@@ -312,7 +343,9 @@ export class GolfGame{
  document.querySelectorAll('[data-shape]').forEach(b=>b.classList.toggle('active',Number(b.dataset.shape)===this.shotShape));this.updateShotPreview()}
  startCharge(){if(this.placing||this.spectating)return;if(this.bagPhase||!this.started||this.swinging||this.modal||this.charging)return;this.placeGolfer();this.charging=true;this.orbit=0;this.moveCamera(0,true);this.charge=0;this.notify('HOLD SPACE FOR POWER · RELEASE TO SWING')}
  releaseShot(){if(!this.charging||this.swinging||this.modal)return;this.charging=false;const p=clamp(this.charge,.11,1);this.shots++;this.swinging=true;this.swingTimer=0;this.shotPreview.group.visible=false;this.impactPending=true;this.whooshPending=true;this.strikePower=p;this.cameraShotLine=this.shotDirection();this.shotOrigin=this.position.clone();this.carryYards=null;this.vel.copy(this.launchVelocity(p));this.flightShape=this.shotShape;this.impactSpin=CLUBS[this.club].isIron?CLUBS[this.club].spin:0;this.biteTimer=0;this.ballLaunchDelay=contactTime[this.shotName()];this.golfer.shot(this.shotName());this.notify(p>.74&&p<.88?'PURE STRIKE':'SHOT IN PLAY');this.refresh()}
- update(dt){dt=Math.min(dt,.04);this.world.waterClock.value+=dt;this.splash.update(dt);this.golfer.update(dt);this.updatePlacement();
+ update(dt){if(this.ride){this.updateRide(dt);return}dt=Math.min(dt,.04);this.world.waterClock.value+=dt;this.splash.update(dt);this.golfer.update(dt);this.updatePlacement();
+  if(this.started&&!this.upcomingRide&&!this.swinging&&this.position.distanceToSquared(this.world.holePosition)<65*65)this.prepareNextTee();
+  if(this.upcomingRide)this.upcomingRide.to.waterClock.value+=dt;
   if(this.waterWait>0){
    this.waterWait=Math.max(0,this.waterWait-dt);this.moveCamera(dt);
    if(!this.waterWait){
@@ -385,6 +418,13 @@ export class GolfGame{
   }
   this.camera.position.lerp(desired, snap ? 1 : 1 - Math.exp(-dt * 8));
   this.camera.lookAt(this.cameraTarget);
+  if(this.arrivalView&&!snap){
+   const view=this.arrivalView;view.time+=dt;
+   const mix=THREE.MathUtils.smoothstep(view.time,0,.85);
+   this.camera.position.lerpVectors(view.eye,desired,mix);
+   this.camera.quaternion.slerp(view.rotation,1-mix);
+   if(mix===1)this.arrivalView=null;
+  }
  }
  menuCamera(dt){if(this.previewMode){const target=this.golfer.root.position.clone().add(new THREE.Vector3(0,1,0)),desired=target.clone().add(new THREE.Vector3(.25,.15,2.7));this.camera.position.lerp(desired,Math.min(1,dt*4));this.camera.lookAt(target);this.golfer.root.rotation.y=Math.sin(performance.now()*.00025)*.24;return}const t=performance.now()*.0001,desired=new THREE.Vector3(36+Math.sin(t)*16,30,-5+Math.cos(t)*35);this.camera.position.lerp(desired,dt*.4);this.camera.lookAt(this.world.holePosition.clone().lerp(this.world.teePosition,.42).add(new THREE.Vector3(0,3,0)))}
  renderScorecard(){
@@ -398,8 +438,12 @@ export class GolfGame{
    return `<table><caption>${half?'Back nine':'Front nine'}</caption><thead><tr><th>Hole</th>${numbers}<th>Total</th></tr></thead><tbody><tr><th scope="row">Strokes</th>${strokes}<td>${sum}</td></tr></tbody></table>`;
   }).join('');
  }
- finishHole(){if(this.modal||!this.started||this.course==='range'||this.scores.length!==this.index||this.shots<1)return;this.onSfx('cup');this.shotPreview.group.visible=false;this.swinging=false;this.charging=false;this.modal=true;this.scores.push(this.shots);const par=this.world.hole.par,d=this.shots-par;let title=d===-3?'ALBATROSS':d===-2?'EAGLE':d===-1?'BIRDIE':d===0?'PAR':d===1?'BOGEY':d===2?'DOUBLE BOGEY':`${d>0?'+':''}${d}`;if(this.shots===1)title='HOLE IN ONE';$('roundEyebrow').textContent='HOLE COMPLETE';$('roundTitle').textContent=title;$('roundDescription').textContent=`${this.shots} STROKES · PAR ${par} · ${COURSES[this.course].name}`;this.onHoleComplete?.(this.roundId,this.index,this.shots);this.renderScorecard();$('nextHole').textContent=this.index===COURSES[this.course].holes.length-1?'VIEW FINAL SCORE →':'NEXT HOLE →';$('roundModal').classList.remove('hidden');if(d<0)this.golfer.shot('cheer')}
- next(){if(this.index+1<COURSES[this.course].holes.length){this.startHole(this.index+1);return}const total=this.scores.reduce((a,b)=>a+b,0),par=COURSES[this.course].holes.reduce((a,b)=>a+b.par,0),diff=total-par;$('roundEyebrow').textContent='ROUND COMPLETE';$('roundTitle').textContent=diff===0?'EVEN PAR':diff>0?`+${diff}`:String(diff);$('roundDescription').textContent=`${total} TOTAL STROKES · ${COURSES[this.course].name}`;this.renderScorecard();$('nextHole').textContent='PLAY AGAIN ↻';this.index=COURSES[this.course].holes.length;const key='prestiege-records';try{const records=JSON.parse(localStorage.getItem(key)||'[]');records.push({course:this.course,total,par,date:new Date().toISOString()});localStorage.setItem(key,JSON.stringify(records.slice(-50)))}catch{}}
+ finishHole(){if(this.modal||!this.started||this.course==='range'||this.scores.length!==this.index||this.shots<1)return;this.onSfx('cup');this.shotPreview.group.visible=false;this.swinging=false;this.charging=false;this.modal=true;this.scores.push(this.shots);const par=this.world.hole.par,d=this.shots-par;let title=d===-3?'ALBATROSS':d===-2?'EAGLE':d===-1?'BIRDIE':d===0?'PAR':d===1?'BOGEY':d===2?'DOUBLE BOGEY':`${d>0?'+':''}${d}`;if(this.shots===1)title='HOLE IN ONE';$('roundEyebrow').textContent='HOLE COMPLETE';$('roundTitle').textContent=title;$('roundDescription').textContent=`${this.shots} STROKES · PAR ${par} · ${COURSES[this.course].name}`;this.onHoleComplete?.(this.roundId,this.index,this.shots);this.renderScorecard();$('nextHole').textContent=this.index===COURSES[this.course].holes.length-1?'VIEW FINAL SCORE →':'DRIVE TO NEXT TEE →';$('roundModal').classList.remove('hidden');if(d<0)this.golfer.shot('cheer')}
+ next(){if(this.index+1<COURSES[this.course].holes.length){this.driveTo(this.index+1);return}const total=this.scores.reduce((a,b)=>a+b,0),par=COURSES[this.course].holes.reduce((a,b)=>a+b.par,0),diff=total-par;$('roundEyebrow').textContent='ROUND COMPLETE';$('roundTitle').textContent=diff===0?'EVEN PAR':diff>0?`+${diff}`:String(diff);$('roundDescription').textContent=`${total} TOTAL STROKES · ${COURSES[this.course].name}`;this.renderScorecard();$('nextHole').textContent='PLAY AGAIN ↻';this.index=COURSES[this.course].holes.length;const key='prestiege-records';try{const records=JSON.parse(localStorage.getItem(key)||'[]');records.push({course:this.course,total,par,date:new Date().toISOString()});localStorage.setItem(key,JSON.stringify(records.slice(-50)))}catch{}}
  actionNext(){if(this.index===COURSES[this.course].holes.length){this.begin(this.course);return}this.next()}
- listeners(){window.addEventListener('keydown',e=>{if(!this.started||this.modal||e.target.matches('input,select'))return;if(['Space','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();if(e.code==='Space'&&!e.repeat)this.startCharge();if(e.code==='ArrowLeft'||e.code==='KeyA')this.aimDelta(-2);if(e.code==='ArrowRight'||e.code==='KeyD')this.aimDelta(2);if(e.code==='KeyC'&&!e.repeat)this.openBag();if(e.code==='Escape')this.returnFromBag(this.club);if(e.code==='KeyZ')this.setShape(-1);if(e.code==='KeyX')this.setShape(0)});window.addEventListener('keyup',e=>{if(e.code==='Space')this.releaseShot()});window.addEventListener('blur',()=>{if(this.charging)this.releaseShot()});window.addEventListener('pointerdown',e=>{if(e.target.closest('.game-hud,nav,.modal,button,.account-gate'))return;this.dragging=true;this.dragStart=e.clientX});window.addEventListener('pointermove',e=>{if(this.dragging&&!this.bagPhase&&!this.swinging&&!this.charging)this.orbit+=(e.clientX-this.dragStart)*.003;this.dragStart=e.clientX});window.addEventListener('pointerup',()=>this.dragging=false)}
+ listeners(){document.querySelectorAll('[data-cart]').forEach(button=>{
+  const field=cartKeys[button.dataset.cart];
+  button.onpointerdown=e=>{if(!this.ride)return;button.setPointerCapture(e.pointerId);this[field]=true};
+  button.onlostpointercapture=()=>{this[field]=false};
+ });window.addEventListener('keydown',e=>{if(this.ride){const field=cartKeys[e.code];if(field){e.preventDefault();this[field]=true}return}if(!this.started||this.modal||e.target.matches('input,select'))return;if(['Space','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();if(e.code==='Space'&&!e.repeat)this.startCharge();if(e.code==='ArrowLeft'||e.code==='KeyA')this.aimDelta(-2);if(e.code==='ArrowRight'||e.code==='KeyD')this.aimDelta(2);if(e.code==='KeyC'&&!e.repeat)this.openBag();if(e.code==='Escape')this.returnFromBag(this.club);if(e.code==='KeyZ')this.setShape(-1);if(e.code==='KeyX')this.setShape(0)});window.addEventListener('keyup',e=>{if(cartKeys[e.code])this[cartKeys[e.code]]=false;if(e.code==='Space')this.releaseShot()});window.addEventListener('blur',()=>{this.cartLeft=this.cartRight=this.cartBoost=false;if(this.charging)this.releaseShot()});window.addEventListener('pointerdown',e=>{if(e.target.closest('.game-hud,nav,.modal,button,.account-gate'))return;this.dragging=true;this.dragStart=e.clientX});window.addEventListener('pointermove',e=>{if(this.dragging&&!this.bagPhase&&!this.swinging&&!this.charging)this.orbit+=(e.clientX-this.dragStart)*.003;this.dragStart=e.clientX});window.addEventListener('pointerup',()=>this.dragging=false)}
 }

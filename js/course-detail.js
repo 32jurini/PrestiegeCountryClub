@@ -132,7 +132,7 @@ export function cutBunkers(material,holes) {
  material.onBeforeCompile=shader=>{
   previous(shader);
   shader.uniforms.sandAreas={value:holes.map(([x,d,rx,rz])=>new THREE.Vector4(x,70-d,rx,rz))};
-  shader.vertexShader='varying vec2 sandXZ;\n'+shader.vertexShader.replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nsandXZ=(modelMatrix*vec4(transformed,1.)).xz;');
+  shader.vertexShader='varying vec2 sandXZ;\n'+shader.vertexShader.replace('#include <worldpos_vertex>','#include <worldpos_vertex>\nsandXZ=transformed.xz;');
   shader.fragmentShader='varying vec2 sandXZ;uniform vec4 sandAreas['+holes.length+'];\n'+shader.fragmentShader.replace('#include <alphatest_fragment>',`#include <alphatest_fragment>
    for(int i=0;i<${holes.length};i++){vec4 area=sandAreas[i];vec2 q=(sandXZ-area.xy)/area.zw;float a=atan(q.y,q.x);if(length(q)<.996*(1.+.14*sin(3.*a+.5)+.08*cos(5.*a)))discard;}`);
  };

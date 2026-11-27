@@ -43,6 +43,7 @@ export class Match {
  update(dt){
   const g=this.game;
   if(!this.ready)return;
+  if(g.ride){g.updateRide(dt);return}
   if(!g.spectating){
    if(!this.result)g.update(dt);
    if(!this.result&&performance.now()-this.lastSend>65){
@@ -68,10 +69,12 @@ export class Match {
    g.camera.quaternion.slerp(g.camera.quaternion.clone().fromArray(f.camera,3),blend);
    g.ball.position.lerp(target.fromArray(f.ball),blend);
   }
+  if(g.ball.position.distanceToSquared(g.world.holePosition)<65*65)g.prepareNextTee();
   g.tee.visible=f.tee;g.ball.visible=f.visible;g.ball.material.color.setHex(f.color);
  }
  receive(m){
   if(!this.ready){(this.pending??=[]).push(m);return}
+  if(this.game.ride){if(m.hole===this.hole+1){if(m.kind==='frame'&&this.rideInbox?.at(-1)?.kind==='frame')this.rideInbox.pop();(this.rideInbox??=[]).push(m)}return}
   if(m.hole!==this.hole||m.turn!==this.turn)return;
   if(m.kind==='next'&&this.room.role==='guest'&&this.result){this.advance();return}
   if(this.room.role===this.turn||this.result)return;
@@ -103,7 +106,7 @@ export class Match {
   $('scorecard').textContent=this.standings()+(this.complete?'':' · Continuing to hole '+(this.hole+2));
   const next=$('nextHole');
   next.hidden=false;next.disabled=!this.complete&&this.room.role==='guest';
-  next.textContent=this.complete?'RETURN TO CLUBHOUSE':this.room.role==='host'?'CONTINUE TO HOLE '+(this.hole+2):'NEXT TEE · HOLE '+(this.hole+2);
+  next.textContent=this.complete?'RETURN TO CLUBHOUSE':this.room.role==='host'?'DRIVE TO TEE '+(this.hole+2):'NEXT TEE · HOLE '+(this.hole+2);
   $('toClubhouse').hidden=true;
   $('roundModal').classList.remove('hidden');
   if(!this.complete&&this.room.role==='host')this.timer=setTimeout(()=>this.nextHole(),4500);
@@ -119,7 +122,13 @@ export class Match {
  advance(){
   if(!this.result||this.complete)return;
   clearTimeout(this.timer);
-  this.hole++;this.card={};this.result=false;this.turn='host';this.playTurn(true);
+  if(this.game.ride)return;
+  if(this.lobby.remote)this.lobby.remote.root.visible=false;
+  this.game.driveTo(this.hole+1,()=>{
+   this.hole++;this.card={};this.result=false;this.turn='host';this.playTurn(false);
+   for(const m of this.rideInbox||[])this.receive(m);
+   this.rideInbox=[];
+  });
  }
  stop(){
   clearTimeout(this.timer);this.ready=false;this.game.spectating=false;this.game.ball.material.color.setHex(this.ballColor);
