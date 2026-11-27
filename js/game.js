@@ -5,7 +5,7 @@ import {buildBag} from './golf-bag.js?v=wedges1';
 import {contactTime} from './shot-pose.js?v=approach2';
 import {CLUB_IRONS,curveAcceleration} from './irons.js?v=irons1';
 import * as THREE from 'three';
-import {CourseRide} from './course-ride.js?v=sharedcart1';
+import {CourseRide} from './course-ride.js?v=caddiestep1';
 import {World,COURSES} from './world.js?v=rockpath1';
 import {Golfer} from './actors.js?v=portrait1';
 const clamp=THREE.MathUtils.clamp,$=id=>document.getElementById(id);
