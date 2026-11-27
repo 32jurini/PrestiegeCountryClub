@@ -43,7 +43,19 @@ export class Match {
  update(dt){
   const g=this.game;
   if(!this.ready)return;
-  if(g.ride){g.updateRide(dt);return}
+  if(g.ride){
+   const ride=g.ride,hole=this.hole,turn=this.turn;
+   g.updateRide(dt);
+   if(this.room.role==='host'){
+    this.cartClock=(this.cartClock||0)+dt;
+    if(this.cartClock>=.065||!g.ride){
+     this.cartClock=0;
+     const {loading,distance,lane,unloading}=ride;
+     this.room.send({type:'state',kind:'cart',hole,turn,loading,distance,lane,unloading});
+    }
+   }
+   return;
+  }
   if(!g.spectating){
    if(!this.result)g.update(dt);
    if(!this.result&&performance.now()-this.lastSend>65){
@@ -74,6 +86,15 @@ export class Match {
  }
  receive(m){
   if(!this.ready){(this.pending??=[]).push(m);return}
+  if(m.kind==='cart'){
+   const ride=this.game.ride;
+   if(ride&&this.room.role==='guest'&&m.hole===this.hole&&m.turn===this.turn&&
+    [m.loading,m.distance,m.lane,m.unloading].every(Number.isFinite)){
+    ride.remoteState={loading:Math.max(0,Math.min(1,m.loading)),distance:Math.max(0,Math.min(ride.length,m.distance)),
+     lane:Math.max(-.43,Math.min(.43,m.lane)),unloading:Math.max(0,Math.min(1,m.unloading))};
+   }
+   return;
+  }
   if(this.game.ride){if(m.hole===this.hole+1){if(m.kind==='frame'&&this.rideInbox?.at(-1)?.kind==='frame')this.rideInbox.pop();(this.rideInbox??=[]).push(m)}return}
   if(m.hole!==this.hole||m.turn!==this.turn)return;
   if(m.kind==='next'&&this.room.role==='guest'&&this.result){this.advance();return}
@@ -128,7 +149,7 @@ export class Match {
    this.hole++;this.card={};this.result=false;this.turn='host';this.playTurn(false);
    for(const m of this.rideInbox||[])this.receive(m);
    this.rideInbox=[];
-  });
+  },{role:this.room.role,driverName:this.room.remoteName,remote:this.lobby.remote});
  }
  stop(){
   clearTimeout(this.timer);this.ready=false;this.game.spectating=false;this.game.ball.material.color.setHex(this.ballColor);

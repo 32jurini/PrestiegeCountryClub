@@ -1,10 +1,10 @@
-import {Match} from './match.js?v=cart1';
+import {Match} from './match.js?v=sharedcart1';
 import {Clubhouse} from './clubhouse.js?v=portrait1';
 import {poloTile} from './polo-patterns.js?v=playergear1';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {lightClubs} from './club-model.js?v=wedges1';
 import * as THREE from 'three';
-import {GolfGame} from './game.js?v=rockpath1';
+import {GolfGame} from './game.js?v=sharedcart1';
 import {SoundEngine} from './sound.js?v=strikefield';
 import {OnlineRoom} from './online.js?v=vote1';
 import {FriendsService,isOnline} from './friends.js?v=invite2';

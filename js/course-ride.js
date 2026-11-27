@@ -15,7 +15,7 @@ function clip(world,plane){
 }
 
 // Seat the fitted character using bone directions in cart space. The live swing rig stays independent.
-function rider(actor,passenger,owned){
+function rider(actor,passenger,owned,caddie=false){
  const figure=clone(actor.model),source=[],copies=[];
  actor.model.traverse(o=>source.push(o));figure.traverse(o=>copies.push(o));
  figure.position.set(0,0,0);figure.quaternion.identity();
@@ -25,7 +25,7 @@ function rider(actor,passenger,owned){
    const rest=actor.basePose.get(source[i]);if(rest)o.quaternion.copy(rest);
    const name=o.name.replace(/^mixamorig\d*[:_]?/,'');if(!bones.has(name))bones.set(name,o);
   }
-  if(passenger&&Array.isArray(o.material)&&o.material.includes(actor.outfit?.shirt)){
+  if(caddie&&Array.isArray(o.material)&&o.material.includes(actor.outfit?.shirt)){
    const mats=o.material.slice(),idx=mats.indexOf(actor.outfit.shirt);
    mats[idx]=mats[idx].clone();mats[idx].color.setHex(0xe7deb9);owned.push(mats[idx]);o.material=mats;
   }
@@ -40,14 +40,47 @@ function rider(actor,passenger,owned){
   a.quaternion.copy(a.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(q));
  }
  for(const [s,k] of [['Left',1],['Right',-1]]){
+  point(s+'Arm',s+'ForeArm',v(k*.16,-1,.06));point(s+'ForeArm',s+'Hand',v(0,-1,.22));
+ }
+ const rest=new Map([...bones.values()].map(b=>[b,b.quaternion.clone()]));
+ for(const [s,k] of [['Left',1],['Right',-1]]){
   point(s+'UpLeg',s+'Leg',v(k*.10,-.12,1));point(s+'Leg',s+'Foot',v(0,-1,.20));
   point(s+'Arm',s+'ForeArm',v(k*.26,-.84,.45));point(s+'ForeArm',s+'Hand',passenger?v(k*.12,.3,.9):v(-k*.22,.16,1));
  }
  const hip=bones.get('Hips');if(hip)figure.position.sub(hip.getWorldPosition(v()));
- const seat=new T.Group();seat.add(figure);return {seat,hand:bones.get('RightHand')};
+ const seat=new T.Group();seat.add(figure);
+ const seated=new Map([...bones.values()].map(b=>[b,b.quaternion.clone()]));
+ function pose(mix){
+  for(const [bone,q] of rest)bone.quaternion.copy(q).slerp(seated.get(bone),mix);
+ }
+ function reach(target,weight){
+  const shoulder=bones.get('RightArm'),elbow=bones.get('RightForeArm'),hand=bones.get('RightHand');
+  if(!shoulder||!elbow||!hand||!weight)return;
+  const startArm=shoulder.quaternion.clone(),startElbow=elbow.quaternion.clone();
+  const a=shoulder.getWorldPosition(v()),b=elbow.getWorldPosition(v()),c=hand.getWorldPosition(v());
+  const upper=a.distanceTo(b),lower=b.distanceTo(c),axis=target.clone().sub(a);
+  const dist=T.MathUtils.clamp(axis.length(),Math.abs(upper-lower)+.001,upper+lower-.001);
+  axis.normalize();
+  const along=(upper*upper-lower*lower+dist*dist)/(2*dist);
+  const pole=v(0,-1,0);pole.addScaledVector(axis,-axis.dot(pole)).normalize();
+  const arm=axis.multiplyScalar(along).addScaledVector(pole,Math.sqrt(Math.max(0,upper*upper-along*along)));
+  point('RightArm','RightForeArm',arm);
+  point('RightForeArm','RightHand',target.clone().sub(elbow.getWorldPosition(v())));
+  shoulder.quaternion.slerp(startArm,1-weight);elbow.quaternion.slerp(startElbow,1-weight);
+ }
+ return {seat,pose,reach};
 }
 
-function cart(game){
+// The second bag shares the existing club geometry and materials, without copying interaction state.
+function bagDisplay(source){
+ const copy=source.isMesh?new T.Mesh(source.geometry,source.material):new T.Group();
+ copy.position.copy(source.position);copy.quaternion.copy(source.quaternion);copy.scale.copy(source.scale);
+ copy.castShadow=source.castShadow;copy.receiveShadow=source.receiveShadow;
+ for(const part of source.children)copy.add(bagDisplay(part));
+ return copy;
+}
+
+function cart(game,party){
  const root=new T.Group(),owned=[];
  const part=(geo,color,x,y,z)=>{
   const mat=new T.MeshStandardMaterial({color,roughness:.68});owned.push(mat,geo);
@@ -72,13 +105,42 @@ function cart(game){
  glass.material.transparent=true;glass.material.opacity=.14;glass.material.depthWrite=false;glass.castShadow=false;
  const wheel=part(new T.TorusGeometry(.20,.023,8,28),0x252d29,-.40,1.07,.40);wheel.rotation.x=-.65;
  box(-.4,.89,.51,.055,.38,.055,0x303532).rotation.x=-.45;
- const driver=rider(game.golfer,false,owned),caddie=rider(game.golfer,true,owned);
- for(const [person,x] of [[driver,-.4],[caddie,.4]]){root.add(person.seat);person.seat.position.set(x,.83,-.42)}
- const bag=game.bag;root.add(bag);bag.visible=true;game.showBagClubs(null);
- const hand=caddie.hand?.getWorldPosition(v())??v(.52,1.1,.13);
- bag.position.copy(hand).add(v(.08,-.57,.09));bag.rotation.z=-.15;
- game.scene.add(root);
- return {root,dispose(){
+ const remote=party?.remote?.model?party.remote:game.golfer;
+ const guest=party?.role==='guest';
+ const driver=rider(guest?remote:game.golfer,false,owned);
+ const passenger=rider(guest||!party?game.golfer:remote,true,owned,!party);
+ root.add(driver.seat,passenger.seat);
+ driver.seat.position.set(-.4,.83,-.42);passenger.seat.position.set(.4,.83,-.42);
+ const bag=game.bag;game.showBagClubs(null);bag.visible=true;
+ const bags=party?[guest?bagDisplay(bag):bag,guest?bag:bagDisplay(bag)]:[bag];
+ const handlers=party?[driver,passenger]:[passenger];
+ box(0,.56,-1.23,1.4,.08,.5,0x313a34);
+ root.add(...bags);game.scene.add(root);
+ const phase=(t,a,b)=>ease(T.MathUtils.clamp((t-a)/(b-a),0,1));
+ function loadBags(t,ground){
+  for(let i=0;i<bags.length;i++){
+   const side=handlers[i]===driver?-1:1,person=handlers[i],item=bags[i];
+   const lift=phase(t,.16,.57),board=phase(t,.64,1),bend=Math.sin(Math.PI*phase(t,0,.65));
+   const rackX=side*.40,groundZ=-2.12;
+   item.position.set(rackX,.60*lift+.18*Math.sin(Math.PI*lift),T.MathUtils.lerp(groundZ,-1.24,lift));
+   const spot=root.localToWorld(v(rackX,0,groundZ));
+   item.position.y+=(ground(spot.x,spot.z)-root.position.y)*(1-lift);
+   item.rotation.set(-.09*lift,0,0);
+   person.pose(board);
+   const z=T.MathUtils.lerp(groundZ-.30,-1.66,lift);
+   person.seat.position.set(rackX+.19*(1-board)+side*.68*Math.sin(Math.PI*board),
+    T.MathUtils.lerp(.95-.13*bend,.83,board),
+    T.MathUtils.lerp(z,-.42,board));
+   const feet=root.localToWorld(person.seat.position.clone());
+   person.seat.position.y+=(ground(feet.x,feet.z)-root.position.y)*(1-board);
+   person.seat.rotation.x=.30*bend;
+   if(t<.74){
+    const target=item.localToWorld(v(.035,.77,-.10));
+    person.reach(target,phase(t,.01,.15)*(1-phase(t,.59,.73)));
+   }
+  }
+ }
+ return {root,bags,loadBags,dispose(){
   game.scene.add(bag);bag.rotation.set(0,0,0);bag.visible=false;root.removeFromParent();owned.forEach(o=>o.dispose());
   root.traverse(o=>{if(o.isSkinnedMesh)o.skeleton.dispose()});
  }};
@@ -152,8 +214,8 @@ export class CourseRide{
   this.road=new T.Mesh(geo,new T.MeshStandardMaterial({vertexColors:true,roughness:1,side:T.DoubleSide}));
   this.road.receiveShadow=true;g.scene.add(this.road);
  }
- board(){
-  const g=this.game;this.cart=cart(g);this.origin=g.camera.position.clone();this.initialRotation=g.camera.quaternion.clone();this.elapsed=0;
+ board(party){
+  const g=this.game;this.party=party;this.loading=0;this.unloading=0;this.lane=0;this.cart=cart(g,party);this.origin=g.camera.position.clone();this.initialRotation=g.camera.quaternion.clone();this.elapsed=0;
  }
  grade(x,z){
   const a=this.from.groundHeight(x,z),b=this.to.groundHeight(x-this.offset.x,z-this.offset.z)+this.offset.y;
@@ -163,23 +225,38 @@ export class CourseRide{
  height(x,z){return this.grade(x,z)+.085}
  update(dt){
   this.elapsed+=dt;const g=this.game;
+  if(this.party?.role==='guest'){
+   if(this.remoteState){
+    const state=this.remoteState,mix=1-Math.exp(-dt*32);
+    this.loading=state.loading===1?1:T.MathUtils.lerp(this.loading,state.loading,mix);
+    this.distance=state.distance===this.length?this.length:T.MathUtils.lerp(this.distance,state.distance,mix);
+    this.lane=T.MathUtils.lerp(this.lane,state.lane,mix);
+    this.unloading=state.unloading===1?1:T.MathUtils.lerp(this.unloading,state.unloading,mix);
+   }
+  }else if(this.loading<1)this.loading=Math.min(1,this.loading+dt/3.4);
+  else if(this.distance>=this.length)this.unloading=Math.min(1,this.unloading+dt/3.4);
+  else{
   const speed=Math.min(g.cartBoost?11:6.7,Math.sqrt(7*(this.length-this.distance))+.65);
   this.speed=T.MathUtils.damp(this.speed,speed,2,dt);this.distance=Math.min(this.length,this.distance+dt*this.speed);
-  const t=this.distance/this.length,p=this.curve.getPointAt(t),dir=this.curve.getTangentAt(t);
   this.lane=T.MathUtils.damp(this.lane||0,(Number(!!g.cartRight)-Number(!!g.cartLeft))*steeringLimit,4,dt);
+  }
+  const t=this.distance/this.length,p=this.curve.getPointAt(t),dir=this.curve.getTangentAt(t);
   p.x-=dir.z*this.lane;p.z+=dir.x*this.lane;
   p.y=this.height(p.x,p.z);this.cart.root.position.copy(p);this.cart.root.rotation.y=Math.atan2(dir.x,dir.z);
-  const eye=this.cart.root.localToWorld(v(-2.6,2.42,-4.25)),focus=this.cart.root.localToWorld(v(0,1,.9));
+  const loading=this.loading<1||this.unloading>0;
+  if(loading||!this.seated){this.cart.loadBags(this.loading-this.unloading,(x,z)=>this.grade(x,z));this.seated=!loading}
+  const eye=this.cart.root.localToWorld(v(-2.6,2.42,-5.15)),focus=this.cart.root.localToWorld(v(0,1,-.55));
   eye.y=Math.max(eye.y,this.height(eye.x,eye.z)+1.4);
   const blend=ease(Math.min(1,this.elapsed/1.1));g.camera.position.lerpVectors(this.origin,eye,blend);
   g.camera.lookAt(focus);g.camera.quaternion.slerp(this.initialRotation,1-blend);g.position.copy(p);
-  return this.distance>=this.length;
+  return this.unloading===1;
  }
  arrive(){
   // Rebase both sectors and the camera together so shot physics can keep tee-local coordinates.
   this.to.root.position.set(0,0,0);this.from.root.position.sub(this.offset);this.road.position.sub(this.offset);
   this.before.constant+=this.offset.z;this.after.constant-=this.offset.z;
   this.to.sky.visible=true;this.from.sky.visible=false;this.game.camera.position.sub(this.offset);
+  this.drop=this.game.bag.getWorldPosition(v()).sub(this.offset);
   this.cart.dispose();this.cart=null;
  }
  releaseRoad(){this.road.removeFromParent();this.road.geometry.dispose();this.road.material.dispose()}
