@@ -1,3 +1,4 @@
+import {poloTrim,fitFace,smoothSeams} from './golfer-detail.js';
 import * as T from 'three';
 import JSZip from 'jszip';
 
@@ -46,10 +47,11 @@ export function fitToRig(actor,[data,maps]) {
  data.groups.forEach((group,index)=>{
   geometry.addGroup(offset,group.length,index);offset+=group.length;
  });
- geometry.setIndex(data.groups.flat());geometry.computeVertexNormals();
+ fitFace(data,geometry);
+ geometry.setIndex(data.groups.flat());geometry.computeVertexNormals();smoothSeams(geometry,data.groups);
  const surface=(map,roughness,extra={})=>new T.MeshStandardMaterial({map,roughness,...extra});
  const skin=surface(maps[0],.73),shirt=surface(maps[1],.94),pants=surface(maps[1],.95);
- const shoes=surface(maps[2],.78),eyes=surface(maps[3],.32);
+ const shoes=surface(maps[2],.78),eyes=new T.MeshPhysicalMaterial({map:maps[3],roughness:.29,clearcoat:1,clearcoatRoughness:.09});
  const strands={side:T.DoubleSide,alphaTest:.28};
  const brows=surface(maps[4],.92,strands),hair=surface(maps[5],.84,strands);
  const cap=new T.MeshStandardMaterial({color:0x213b45,roughness:.9,side:T.DoubleSide});
@@ -60,6 +62,13 @@ export function fitToRig(actor,[data,maps]) {
  actor.model.traverse(o=>{if(o.isSkinnedMesh)o.visible=false});
  actor.root.add(mesh);actor.model.attach(mesh);actor.root.updateMatrixWorld(true);
  mesh.bind(new T.Skeleton(joints));mesh.normalizeSkinWeights();
+ const collar=new T.MeshStandardMaterial({roughness:.92,side:T.DoubleSide});
+ const buttons=new T.MeshStandardMaterial({color:0xbab4a1,roughness:.45,side:T.DoubleSide});
+ const trim=new T.SkinnedMesh(poloTrim(data),[collar,buttons]);
+ mesh.add(trim);trim.bind(mesh.skeleton,mesh.bindMatrix);trim.normalizeSkinWeights();
+ trim.frustumCulled=false;trim.castShadow=true;trim.receiveShadow=true;
+ trim.userData.fitted=true;
+ mesh.morphTargetInfluences[0]=.18;
  // Scale about each wrist and knuckle after binding. The finger chains keep their
  // animated curl, and a grip attached at the wrist keeps its original pivot.
  for(const joint of new Set(joints)){
@@ -77,7 +86,7 @@ export function fitToRig(actor,[data,maps]) {
   if(previous===undefined||position.getY(previous)>y)patches.set(key,i);
  }
  actor.soles={mesh,indices:[...patches.values()],point:new T.Vector3()};
- return {skin,shirt,pants,eyes,hair,brows,ponytail};
+ return {skin,shirt,pants,eyes,hair,brows,ponytail,collar,mesh,blinkTime:Math.random()*2};
 }
 
 export function tintGolfer(materials,colors) {
@@ -86,10 +95,11 @@ export function tintGolfer(materials,colors) {
   if(!colors[part])continue;
   const c=new T.Color(colors[part]);
   // Preserve the diffuse portrait's highlights and natural lip color while tinting complexion.
-  if(part==='skin'){c.r/=0.54;c.g/=0.34;c.b/=0.24}
-  if(part==='eyes')c.lerp(new T.Color(0xffffff),.55);
+  if(part==='skin'){const base=new T.Color('#ba8c70');c.setRGB(c.r/base.r,c.g/base.g,c.b/base.b)}
+  if(part==='eyes')c.lerp(new T.Color(0xffffff),.82);
   materials[part].color.copy(c);
  }
+ materials.collar.color.copy(materials.shirt.color).multiplyScalar(.82);
  materials.ponytail.color.copy(materials.hair.color);
  materials.brows.color.copy(materials.hair.color);
 }

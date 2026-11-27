@@ -1,6 +1,6 @@
 import {fitPalm} from './club-grip.js?v=curl2';
 import {clubModel,makeShaft,heelSocket} from './club-model.js?v=wedges1';
-import {loadFittedModel,fitToRig,tintGolfer} from './tour-golfer.js?v=myplay1';
+import {loadFittedModel,fitToRig,tintGolfer} from './tour-golfer.js?v=portrait1';
 import {measureShot,contactTime} from './shot-pose.js?v=approach2';
 import * as THREE from 'three';
 import {FBXLoader} from 'three/addons/loaders/FBXLoader.js';
@@ -208,6 +208,13 @@ export class Golfer{
  }
  update(dt){
   if(!this.model)return;
+  if(this.outfit){
+   const face=this.outfit;face.blinkTime+=dt;
+   if(face.blinkTime>=4.8)face.blinkTime=-Math.random()*1.6;
+   const t=face.blinkTime-4.56;
+   const blink=t<0?0:t<.08?t/.08:1-(t-.08)/.16;
+   face.mesh.morphTargetInfluences[0]=.18+.82*THREE.MathUtils.smoothstep(blink,0,1);
+  }
   if(this.watchRotation){this.watchHead.quaternion.copy(this.watchRotation);this.watchRotation=null}
   this.model.position.x=this.driveRestX;this.model.position.z=this.driveRestZ;
   this.model.position.y=this.restHeight;

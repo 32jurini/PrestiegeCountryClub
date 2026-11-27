@@ -1,13 +1,13 @@
 import * as T from 'three';
-import {Golfer} from './actors.js?v=curl2';
+import {Golfer} from './actors.js?v=portrait1';
 
 export class Clubhouse {
  constructor(local,stage,finish){
   this.local=local;this.stage=stage;this.finish=finish;
   this.scene=new T.Scene();this.camera=new T.PerspectiveCamera(33,1,.1,30);
-  this.scene.add(new T.HemisphereLight(0xfff6df,0x68766c,2));
-  const key=new T.DirectionalLight(0xffefcc,2.5);key.position.set(-2,4,4);this.scene.add(key);
-  const rim=new T.DirectionalLight(0xf2dbab,2);rim.position.set(2,2,-2);this.scene.add(rim);
+  this.scene.add(new T.HemisphereLight(0xf1f5ff,0x867c71,1.38));
+  const key=new T.DirectionalLight(0xffead4,2.25);key.position.set(-2,4,4);this.scene.add(key);
+  const rim=new T.DirectionalLight(0xffeacb,1.35);rim.position.set(2,2,-2);this.scene.add(rim);
   for(const [i,x,z] of [[0,0,0],[1,.79,-.95]]){
    const mat=new T.MeshStandardMaterial({color:i?0x31483b:0x456144,roughness:.83});
    const plinth=new T.Mesh(new T.CylinderGeometry(.65,.67,.065,80),mat);
