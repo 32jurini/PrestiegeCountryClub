@@ -120,6 +120,7 @@ export function frameHole(world) {
   pose.updateMatrix();mesh.setMatrixAt(i,pose.matrix);
   const tint=.61+.38*noise(i+62);mesh.setColorAt(i,color.setRGB(tint,tint,tint*.93));
  }
+ mesh.userData.rocks=ocean;
  mesh.castShadow=ocean;mesh.receiveShadow=true;world.root.add(mesh);
 
 }

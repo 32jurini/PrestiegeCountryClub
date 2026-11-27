@@ -105,7 +105,7 @@ export function coastalBank(world,clock){
    tints.push(.11,.15,.047,.13,.15,.055,.44,.40,.17);
   }
  }
- world.root.add(rocks);grassGeo.setAttribute('position',new T.Float32BufferAttribute(blades,3));grassGeo.setAttribute('color',new T.Float32BufferAttribute(tints,3));
+ rocks.userData.rocks=true;world.root.add(rocks);grassGeo.setAttribute('position',new T.Float32BufferAttribute(blades,3));grassGeo.setAttribute('color',new T.Float32BufferAttribute(tints,3));
  const grass=new T.MeshBasicMaterial({vertexColors:true,side:T.DoubleSide});
  grass.onBeforeCompile=s=>{s.uniforms.tide=clock;s.vertexShader='uniform float tide;\n'+s.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\n transformed.x+=step(.3,color.r)*.11*sin(tide*2.+position.z*.7);');};
  world.root.add(new T.Mesh(grassGeo,grass));

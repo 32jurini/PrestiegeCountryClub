@@ -1,7 +1,7 @@
 import * as T from 'three';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
 import {clone} from 'three/addons/utils/SkeletonUtils.js';
-import {World} from './world.js?v=cart1';
+import {World} from './world.js?v=rockpath1';
 
 const v=(x=0,y=0,z=0)=>new T.Vector3(x,y,z);
 const ease=t=>t*t*(3-2*t);
@@ -84,6 +84,34 @@ function cart(game){
  }};
 }
 
+// Reserve the swept footprint, including full steering lock and the cart corners.
+const steeringLimit=.43;
+function clearRocks(world,track){
+ const transform=new T.Matrix4(),bounds=new T.Sphere(),color=new T.Color();
+ const clearance=Math.hypot(1.36,.95)+steeringLimit+.35;
+ world.root.updateMatrixWorld(true);
+ world.root.traverse(batch=>{
+  if(!batch.userData.rocks||!batch.count)return;
+  batch.geometry.computeBoundingSphere();
+  let kept=0;
+  for(let i=0;i<batch.count;i++){
+   batch.getMatrixAt(i,transform);
+   bounds.copy(batch.geometry.boundingSphere).applyMatrix4(transform).applyMatrix4(batch.matrixWorld);
+   const reach=(bounds.radius+clearance)**2;
+   if(track.some(p=>(p.x-bounds.center.x)**2+(p.z-bounds.center.z)**2<=reach))continue;
+   if(kept!==i){
+    batch.setMatrixAt(kept,transform);
+    if(batch.instanceColor){batch.getColorAt(i,color);batch.setColorAt(kept,color)}
+   }
+   kept++;
+  }
+  if(kept===batch.count)return;
+  batch.count=kept;batch.instanceMatrix.needsUpdate=true;
+  if(batch.instanceColor)batch.instanceColor.needsUpdate=true;
+  batch.computeBoundingSphere();
+ });
+}
+
 export class CourseRide{
  constructor(g,index){
   this.game=g;this.from=g.world;this.to=new World(g.scene,g.course,index,this.from);
@@ -108,6 +136,8 @@ export class CourseRide{
   this.curve=new T.CatmullRomCurve3([v(pin.x+side*(this.from.green.rx+3),0,pin.z),v(pin.x+side*(this.from.green.rx+3),0,pin.z-10),
    v(center+bend*.35,0,this.seam),v(this.offset.x+side*6,0,this.offset.z+80),v(this.offset.x+side*8.6,0,this.offset.z+71)]);
   this.length=this.curve.getLength();this.distance=0;this.speed=0;
+  const track=this.curve.getSpacedPoints(Math.ceil(this.length/.4));
+  clearRocks(this.from,track);clearRocks(this.to,track);
   const vertices=[],indices=[],colors=[];
   const gravel=new T.Color(g.course==='ocean'?0xc3b897:0xa39d88);
   for(let i=0;i<=96;i++){
@@ -136,7 +166,7 @@ export class CourseRide{
   const speed=Math.min(g.cartBoost?11:6.7,Math.sqrt(7*(this.length-this.distance))+.65);
   this.speed=T.MathUtils.damp(this.speed,speed,2,dt);this.distance=Math.min(this.length,this.distance+dt*this.speed);
   const t=this.distance/this.length,p=this.curve.getPointAt(t),dir=this.curve.getTangentAt(t);
-  this.lane=T.MathUtils.damp(this.lane||0,(Number(!!g.cartRight)-Number(!!g.cartLeft))*.43,4,dt);
+  this.lane=T.MathUtils.damp(this.lane||0,(Number(!!g.cartRight)-Number(!!g.cartLeft))*steeringLimit,4,dt);
   p.x-=dir.z*this.lane;p.z+=dir.x*this.lane;
   p.y=this.height(p.x,p.z);this.cart.root.position.copy(p);this.cart.root.rotation.y=Math.atan2(dir.x,dir.z);
   const eye=this.cart.root.localToWorld(v(-2.6,2.42,-4.25)),focus=this.cart.root.localToWorld(v(0,1,.9));

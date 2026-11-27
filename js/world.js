@@ -1,9 +1,9 @@
 import {protectGreens} from './green-layout.js';
 import {finishes,mow,ridgeBackdrop,plantMargins,terrainFinish,teeBoard} from './course-finish.js';
-import {waterMaterial,coastalBank,shoreX} from './water.js?v=tour72';
-import {landscape,fairwayCollar,sandFinish,cartPath} from './course-landscape.js?v=tour72';
+import {waterMaterial,coastalBank,shoreX} from './water.js?v=rockpath1';
+import {landscape,fairwayCollar,sandFinish,cartPath} from './course-landscape.js?v=rockpath1';
 import {TreeContact} from './tree-contact.js';
-import {plantTrees,horizon,detailSurface,frameHole,cutBunkers} from './course-detail.js?v=cart1';
+import {plantTrees,horizon,detailSurface,frameHole,cutBunkers} from './course-detail.js?v=rockpath1';
 import {extendCourses} from './full-round.js';
 import * as THREE from 'three';
 export const COURSES={royal:{name:'THE ROYAL CLASSIC',type:'parkland',sky:0x93bed0,fog:0xb4c5a7,grass:0x507849,rough:0x3e6140,fairway:0x7aa65e,trees:0x254b2b,wind:3,holes:[

@@ -61,6 +61,7 @@ export function landscape(world){
    pose.scale.set(size*(isRock?1.65:1),size*(isRock?.58:1),size);pose.updateMatrix();
    batch.setMatrixAt(i,pose.matrix);batch.setColorAt(i,shade.setScalar(.68+.32*v));
   });
+  batch.userData.rocks=isRock;
   batch.receiveShadow=true;world.root.add(batch);
  }
  scatter(grasses,blades,coast?0xc1ad70:park?0x829343:0x899154,false);
